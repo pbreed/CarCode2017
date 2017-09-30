@@ -22,7 +22,8 @@ int16_element ay{"ay"};
 int16_element az{"az"};
 int16_element gz{"gz"};
 float_element head{"head"};
-//float_element rhead{"rhead"};
+float_element  rhead{"rhead"};
+uint32_element axsum{"axsum"};
 uint32_element lidar{"lidar"};
 uint32_element lidmin{"lmin"};
 uint32_element odo{"Odo"};
@@ -64,6 +65,7 @@ CompassCal(config_obj & owner,const char * name="CompassCal"):config_obj(owner,n
     config_int MinC2{32000,"MinC2"};
     config_int SlewLimit{(16384/250),"SlewLimit"};
     config_int SlewSec{30,"SlewSec"};
+	config_bool bUpdateRec{true,"Update"};
 	ConfigEndMarker;
 };
 
@@ -404,6 +406,9 @@ void Mpu9250setup(int TaskPrio)
    OSTimeDly(2);
    I2CResetPeripheral();
    OSTimeDly(2);
+   I2CStop();
+   OSTimeDly(2);
+   I2CStop();
     c = ReadReg(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
    iprintf("Retry ID=%02X\r\n",(int)c);
 
@@ -590,18 +595,22 @@ volatile int16_t IMUResults[8];
 volatile int16_t CompassResult[3];
 volatile int16_t RotVel[3];
 volatile IMUModeEnum ImuMode;
-volatile int32_t AxisSum[3];
+volatile int32_t GAxisSum[3];
+volatile int32_t AAxisSum[3];
+volatile int32_t RawHeadSum;
 
 volatile float MagHeading;
 volatile float IntegratedHeading;
+volatile float RawHeading;
 volatile bool  bIMU_Id;
 
 
-
 int32_t GZero[3];
+int32_t AZero[3];
 
+int32_t GZeroCalc[3];
+int32_t AZeroCalc[3];
 
-long long s2;
 
 
 int32_t ZeroCount;
@@ -617,25 +626,41 @@ switch(ImuMode)
             GZero[0]+=IMUResults[4];
             GZero[1]+=IMUResults[5];
             GZero[2]+=IMUResults[6];
-            s2+=IMUResults[6];
+			AZero[0]+=IMUResults[0];
+			AZero[1]+=IMUResults[1];
+			AZero[2]+=IMUResults[2];
             ZeroCount++;
+			GZeroCalc[0]=GZero[0]/ZeroCount;
+			GZeroCalc[1]=GZero[1]/ZeroCount;
+			GZeroCalc[2]=GZero[2]/ZeroCount;
+		    AZeroCalc[0]=AZero[0]/ZeroCount;
+			AZeroCalc[1]=AZero[1]/ZeroCount;
+			AZeroCalc[2]=AZero[2]/ZeroCount;
+
+
+
+
         }
         break;
 case eRunning :
      {
         for(int i=0; i<3; i++)
-        {
-           int32_t v=IMUResults[4+i];
-           int32_t off=GZero[i];
-           off/=ZeroCount;
-           v-=off;
-           RotVel[i]=v;
-           AxisSum[i]+=v;
-           if (AxisSum[i]>4718592)AxisSum[i]-=2*4718592;
-           if (AxisSum[i]<-4718592)AxisSum[i]+=2*4718592;
+        {  int32_t a=IMUResults[0+i]-AZeroCalc[i];
+           int32_t v=IMUResults[4+i]-GZeroCalc[i];
+           AAxisSum[i]+=a;
+		   RotVel[i]=v;
+           GAxisSum[i]+=v;
+           if (GAxisSum[i]>4718592)GAxisSum[i]-=2*4718592;
+           if (GAxisSum[i]<-4718592)GAxisSum[i]+=2*4718592;
+		   if(i==2)
+		   {
+			   RawHeadSum+=v;
+			   if (RawHeadSum> 4718592)RawHeadSum-=2*4718592;
+			   if (RawHeadSum<-4718592)RawHeadSum+=2*4718592;
+		   }
         }
-        
-		IntegratedHeading=DegScale(AxisSum[2]);
+		IntegratedHeading=DegScale(GAxisSum[2]);
+		RawHeading=DegScale(RawHeadSum);
 
      }
      break;
@@ -659,6 +684,9 @@ void ProcessCompassResults()
 bool bWasDirty=bCompassCalDirty;
 
 
+if(compass_cal.bUpdateRec)
+{
+
 if(CompassResult[0] >compass_cal.MaxC0) {compass_cal.MaxC0=CompassResult[0]; bCompassCalDirty=true; }
 if(CompassResult[1] >compass_cal.MaxC1) {compass_cal.MaxC1=CompassResult[1]; bCompassCalDirty=true; } 
 if(CompassResult[2] >compass_cal.MaxC2) {compass_cal.MaxC2=CompassResult[2]; bCompassCalDirty=true; } 
@@ -667,7 +695,7 @@ if(CompassResult[0] <compass_cal.MinC0) {compass_cal.MinC0=CompassResult[0]; bCo
 if(CompassResult[1] <compass_cal.MinC1) {compass_cal.MinC1=CompassResult[1]; bCompassCalDirty=true; } 
 if(CompassResult[2] <compass_cal.MinC2) {compass_cal.MinC2=CompassResult[2]; bCompassCalDirty=true; } 
 
-
+}
 MagHeading=CalcMagHeading();
 
 
@@ -731,6 +759,8 @@ while(1)
 	 ImuR.dtodo=DtOdoCount;
      ImuR.head=IntegratedHeading;
 	 ImuR.corner=0;
+	 ImuR.rhead=RawHeading;
+	 ImuR.axsum=AAxisSum[0];
 
 	 if(PrevOdo!=OdoCount)
 	 {
@@ -824,7 +854,7 @@ void SetInitalCompass()
 {
 double dv=MagHeading;
 dv*=200.0*32768.0/250.0;
-AxisSum[2]=(int32_t)dv;
+GAxisSum[2]=(int32_t)dv;
 }
 
 void SetGyroCompass(int Slew_Sec)
@@ -858,7 +888,7 @@ error_rem=(error-ierror);
 
     LastIerror=ierror;
 //error now in counts...
-AxisSum[2]+=ierror; //Axissum and inteegrated Heading are opposite sign.
+GAxisSum[2]+=ierror; //GAxisSum and inteegrated Heading are opposite sign.
 
 nCor++;
 
