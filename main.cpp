@@ -28,10 +28,19 @@
 #include "dsm2.h"
 #include "mpu9250.h"
 
-void LogFileVersions();
 
 LOGFILEINFO;
 
+class RunProperties:public config_obj
+{
+public:
+RunProperties():config_obj(appdata,"RunProp") {};
+    config_int CalTime{20,"CalTime"};
+    config_bool  UseMag{true,"UseMag"};
+	ConfigEndMarker;
+};
+
+RunProperties RunProps;
 
 
 
@@ -48,7 +57,6 @@ volatile int nFileMode;	 //340 1025 1780 Ch 6
 
 
 extern int32_t GZero[3];
-extern long long s2;
 extern int32_t ZeroCount;
 
 
@@ -415,6 +423,7 @@ void UserMain(void * pd)
 
 
    LogFileVersions();
+   LogAppRecords();
 
    InitTimer3();   
    Mpu9250setup(MAIN_PRIO-2);
@@ -450,12 +459,12 @@ void UserMain(void * pd)
 
 
 
-   while(Secs<=(Lsec+10))
+   while(Secs<=(Lsec+RunProps.CalTime ))
    {
       OSTimeDly(TICKS_PER_SECOND);
       LCD_X_Y(LCD_SER,0,0);
-        fdprintf(LCD_SER,"Cal: %ld of 10 ",(Lsec-Secs));
-      printf("Cal: %ld of 10 \r\n",(Secs-Lsec));
+        fdprintf(LCD_SER,"Cal: %ld of %ld ",(Lsec-Secs),(int)RunProps.CalTime );
+      printf("Cal: %ld of %ld \r\n",(Secs-Lsec),(int)RunProps.CalTime );
    }
 
    while(Secs==(Lsec+11)) asm(" nop");
@@ -463,8 +472,9 @@ void UserMain(void * pd)
    LCD_CLS(LCD_SER); 
    iprintf("Samples=%ld DT=%ld\r\n",IMUSample-LastImu, Secs-(Lsec+1));
 
-   iprintf("GZ[2]=%ld  S2=%lld n=%ld off=%ld\r\n",GZero[2], s2,ZeroCount,GZero[2]/ZeroCount);
+   iprintf("GZ[2]=%ld n=%ld off=%ld\r\n",GZero[2], ZeroCount,GZero[2]/ZeroCount);
    ImuMode=eRunning;
+   OSTimeDly(10);
    SetInitalCompass();
 
 
@@ -488,10 +498,7 @@ void UserMain(void * pd)
 
    if(charavail())
    {switch(getchar())
-      { case 'z':
-        case 'Z':
-        AxisSum[2]=0;
-        break;
+      {
       }
    }
    
@@ -511,7 +518,7 @@ void UserMain(void * pd)
    */
    if(bIMU_Id)
 	{if(Secs &1)
-	   fdprintf(LCD_SER,"X%ld,%3.0f  ",OdoCount,IntegratedHeading);
+	   fdprintf(LCD_SER,"X%ld,%3.0f,%3.0f  ",OdoCount,IntegratedHeading,MagHeading);
    else
 	   fdprintf(LCD_SER,"+%ld,%3.0f  ",OdoCount,IntegratedHeading);
    }

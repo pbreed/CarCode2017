@@ -9,7 +9,8 @@
 #include <nettypes.h>
 #include <ftpd.h>
 #include <nbrtos.h>
-
+#include <config_obj.h>
+#include <iointernal.h>
 #include "introspec.h"
 
 LOGFILEINFO;
@@ -241,9 +242,9 @@ void IntrospecObject::LogStructure()
 }
 
 
-void IntrospecObject::Log()
+void IntrospecObject::Log(bool bForceLog)
 {
-if(!bLog) return;
+if((!bLog) && (!bForceLog))return;
 if(!pDesc)
 {
 pDesc=BuildOrFindDescription(m_name);
@@ -271,8 +272,11 @@ OSCriticalSectionObj oc(LogCrit);
 
 
 
-void LogMessage(const char * cp)
+
+
+void LogMessage(const char * cp,bool bForceLog)
 {
+if((!bLog) && (!bForceLog))return;
 OSCriticalSectionObj oc(LogCrit);
 LogEscapedByte(KEY_START);
 LogRawByte(KEY_MESSAGE);
@@ -281,8 +285,9 @@ while(*cp)
     LogRawByte(0);
 
 }
-void LogEvent()
+void LogEvent(bool bForceLog)
 {
+if((!bLog) && (!bForceLog))return;
 OSCriticalSectionObj oc(LogCrit);
 LogEscapedByte(KEY_START);
 LogRawByte(KEY_EVENT);
@@ -529,16 +534,38 @@ void LogFileVersions()
 {
  FileLog * pl=pHead;
  USER_ENTER_CRITICAL();
- {
- bool OldLog=bLog;
- bLog=true;
  while(pl)
  {
-  LogMessage(pl->LogMsg);
+  LogMessage(pl->LogMsg,true);
   pl=pl->pNext;
  }
- bLog=OldLog;
- }
  USER_EXIT_CRITICAL();
+}
+
+
+
+	  int LogEXRead( int fd, char *buf, int nbytes)  {return 0;}
+	  int LogEXClose( int fd)  {return 0;}
+	  int LogEXWrite( int fd, const char *buf, int nbytes )
+	  {
+		  for(int i=0; i<nbytes; i++) LogRawByte(buf[i]);
+		return nbytes;
+	  }
+
+
+void LogAppRecords()
+{
+IoExpandStruct ioe;
+ioe.read=LogEXRead;
+ioe.close=LogEXClose;
+ioe.write=LogEXWrite;
+
+OSCriticalSectionObj oc(LogCrit);
+LogEscapedByte(KEY_START);
+LogRawByte(KEY_MESSAGE);
+int LogFd=GetExtraFD( 0,&ioe);
+appdata.RenderToFd(LogFd,true);
+LogRawByte(0);
+FreeExtraFd(LogFd);
 }
 

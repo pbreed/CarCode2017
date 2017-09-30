@@ -55,8 +55,7 @@ END_INTRO_OBJ;
 class CompassCal:public config_obj
 {
 public:
-CompassCal(const char * name="CompassCal"):config_obj(name) {};
-CompassCal(config_obj & owner,const char * name="CompassCal"):config_obj(owner,name) {};
+CompassCal():config_obj(appdata,"CompassCal") {};
     config_int MaxC0{-32000,"MaxC0"};
     config_int MaxC1{-32000,"MaxC1"};
     config_int MaxC2{-32000,"MaxC2"};
@@ -73,7 +72,7 @@ CompassCal(config_obj & owner,const char * name="CompassCal"):config_obj(owner,n
 class LidarCornerParams:public config_obj
 {
 public:
-LidarCornerParams(const char * name="LidarCorner"):config_obj(name) {};
+LidarCornerParams():config_obj(appdata,"LidarCorner") {};
     config_int det_diff{400000,"diff"};
 	ConfigEndMarker;
 };

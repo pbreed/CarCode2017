@@ -18,7 +18,7 @@ IntrospecObject(const char * name);
 virtual void GetExtent(uint32_t * & sm, uint32_t * &em)=0;
 virtual void BuildOne()=0;
 void LogStructure();
-void Log();
+void Log(bool ForceLog=false);
 };
 
 
@@ -101,14 +101,16 @@ typedef INTROFEL<double>    double_element;
 
 
 
-void LogMessage(const char * cp);
-void LogEvent();
+void LogMessage(const char * cp, bool force=false);
+void LogEvent(bool force=false);
 void InitLogFtp(int prio);
 int GetLogPercent();
 int GetLogSize();
 
 extern volatile bool bLog;					  
 
+void LogFileVersions();
+void LogAppRecords();
 
 class FileLog
 {
