@@ -3,5 +3,8 @@ void ServoDriveInit();
 void SetServoPos(int servo, double v);
 void SetServoRaw(int servo, int v);
 
+extern OS_SEM * pNotifyNextFrameSem;
+extern volatile uint32_t ServoFrameCnt;
+
 #define NUM_SERVO_DRIVE (3)
 

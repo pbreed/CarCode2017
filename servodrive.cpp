@@ -40,6 +40,11 @@ volatile uint32_t ServoIsr[NUM_SERVO_DRIVE];
 #define MODE_SERVO_START (2)
 
 
+OS_SEM * pNotifyNextFrameSem;
+volatile uint32_t ServoFrameCnt;
+
+
+extern OS_SEM MainTaskSem;
 
 volatile uint32_t IsrCorrections;
 
@@ -61,10 +66,12 @@ void CoreRcTimer(int ch)
 			 ServoElapsed[ch]=ServoTimes[ch];
              ntrr=ServoTimes[ch];
 		     ServoMode[ch]=MODE_SERVO_PULSE;
+			 if(pNotifyNextFrameSem) pNotifyNextFrameSem->Post();
             break;
 	}
 
 		sim2.timer[ch].trr=ntrr;
+		ServoFrameCnt++;
 }
 
 

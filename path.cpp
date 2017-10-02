@@ -94,16 +94,11 @@ return (float)d*180.0/PI;
 }
 
 
-void PopulatePath()
+
+void ParseAndPopulatePath(const char * cp)
 {
-const char * cp;
-if(pPostPath) 
-	{cp=pPostPath;
-    }
-else
-{ cp=(const char *)PathData;
-}
 const char * cpo;
+
 
 cp=strstr(cp,"Path");
 if(cp)
@@ -171,20 +166,23 @@ if (*cp)
 }
 }
 
-/*
-	"Path": [{
-		"pt": {
-			"x": 119.67914873018567,
-			"y": 356.8921205962438
-		},
-		"Edgev": null,
-		"corner_d": null,
-		"next_seq": null,
-		"bStop": false,
-		"Options": null,
-		"Speed": null
-	},
-*/
+void PopulatePath()
+{
+const char * cp;
+if(pPostPath) 
+	{cp=pPostPath;
+    }
+else
+{ cp=(const char *)PathData;
+}
+
+ParseAndPopulatePath(cp);
+}
+
+
+
+
+
 
 
 void trimlead(const char * &cp)

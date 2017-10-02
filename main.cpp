@@ -23,6 +23,7 @@
 #include <cfinter.h>
 #include <multipartpost.h>
 
+#include "SinLookup.h"
 #include "servodrive.h"
 #include "introspec.h"
 #include "lidar.h"
@@ -38,11 +39,13 @@ public:
 RunProperties():config_obj(appdata,"RunProp") {};
     config_int CalTime{20,"CalTime"};
     config_bool  UseMag{true,"UseMag"};
+	config_double ODODist{4.58,"OdoDist"};
 	ConfigEndMarker;
 };
 
 RunProperties RunProps;
 
+OS_SEM MainTaskSem;
 
 
 const char * AppName="Avc2017";
@@ -81,6 +84,8 @@ dt=(t-LastOdoTime);
 }
 DtOdoCount=dt;
 LastOdoTime=t;
+
+MainTaskSem.Post();
 }
 
 
@@ -156,7 +161,6 @@ extern volatile uint32_t nCor;
 extern volatile double lferror;
 
 
-OS_SEM RCFrameSem;
 
 
 void ProcessNewRCPos(uint32_t ch, uint32_t v)
@@ -164,25 +168,20 @@ void ProcessNewRCPos(uint32_t ch, uint32_t v)
 static uint32_t LastCount;
 	   switch(ch)
 	   {
-	   case 0: break; //Throttle
+	   case 0: break; //Alieron
 	
-	   case 1:
-		   if(nActiveMode==0) SetServoRaw(0,v);
-		   break;
+	   case 1: break; //Elevator
 	
-	   case 2:
-		   //if(nActiveMode==0) 
-		   SetServoRaw(1,v);
-           break;
+	   case 2: break; //Throttle
 
-	   case 3: //Rudder
-		    break;
+	   case 3: break; //Rudder 
 
 	   case 4: //Gear Switch
 		   if(v<1024) bLog=false;
 		   else
-			bLog=true;
+			          bLog=true;
 		   break;
+	   
 	   case 5: //nActiveMode
 		     break;
 
@@ -195,9 +194,10 @@ static uint32_t LastCount;
 		break;
    }
 
+
 if(RCFrameCnt!=LastCount)
   {
-	RCFrameSem.Post();
+	MainTaskSem.Post();
 	LastCount=RCFrameCnt;
   }
 }
@@ -249,7 +249,6 @@ else
 {
 dt=(t-lot);
 }
-
 if(dt<125000000) return true;
 return false;
 }
@@ -272,9 +271,21 @@ float_element i{"ierr"};
 uint8_element m{"move"};
 END_INTRO_OBJ;
 
+
+START_INTRO_OBJ(CurPosObj,"POS")
+float_element x{"x"};
+float_element y{"y"};
+END_INTRO_OBJ;
+
+
+
 static ModeChangeObj mco;
 static SteerLoopObj slo;
 static BootSecObj   bso;
+static CurPosObj    cpo;
+
+static float Pos_x;
+static float Pos_y;
 
 
 const float steer_p =0.01;
@@ -316,73 +327,20 @@ slo.i=ierr;
 slo.Log();
 }
 
-static int SeqMode;
-static uint32_t LastSOdo;
 
-//Heading 30deg for 100 count
-//Heading -60   for 40 count
-//Heading -150  for 100 count
-//Heading 120   for 40 count
-void DoSequence()
-{
-if(nActiveMode==2)
-{
-switch (SeqMode) 
-{
-case 0:
-	 TargetHeading=145;
-	 if((OdoCount-LastSOdo)>=130) 
-		{SeqMode++;
-		 LastSOdo=OdoCount;
-        }
-	break;
-case 1:
-	 TargetHeading=145-90;
-	 if((OdoCount-LastSOdo)>=100) 
-		{SeqMode++;
-		 LastSOdo=OdoCount;
-        }
-	break;
-case 2:
-	 TargetHeading=145-180;
-	 if((OdoCount-LastSOdo)>=130) 
-		{SeqMode++;
-		 LastSOdo=OdoCount;
-        }
-	break;
 
-case 3:
-	 TargetHeading=145-270;
-	 if((OdoCount-LastSOdo)>=100) 
-		{SeqMode=0;
-		 LastSOdo=OdoCount;
-        }
-	break;
-}
-}
 
-Steer();
+
+void ProcessNewImuData()
+{
+
+
 }
 
 
-void ProcessNewTick()
-{
- if(nActiveMode!=0)DoSequence();
-
-
-
-
-}
 
 void ModeChange(int new_mode, int prev_mode)
 {
- if(prev_mode==0) TargetHeading=IntegratedHeading;
-
- if ((prev_mode==1) && (new_mode==2))
- {
-  LastSOdo=OdoCount;
-  SeqMode=0;
- }
  mco.m=(int16_t)new_mode;
  mco.Log();
 }
@@ -390,8 +348,105 @@ void ModeChange(int new_mode, int prev_mode)
 
 
 extern volatile uint32_t LidarRxc;
-
 extern void RegisterPost();
+
+int LCD_SER;
+
+void LCD_DisplayTask(void * pd)
+{
+	uint32_t LastLidar=LidarScanCount;
+	uint32_t LastRCFrame=RCFrameCnt;
+	uint32_t Lsec=Secs;
+    uint32_t LastImu=IMUSample;
+
+	while (1)
+   {//Main processing loop
+
+
+	if(Lsec!=Secs)
+	{
+		Lsec=Secs;
+		bso.s=Secs;
+		bso.Log();
+
+		LCD_X_Y(LCD_SER,0,0);
+		if(bIMU_Id)
+		{if(Secs &1)
+			fdprintf(LCD_SER,"X%ld,%3.0f,%3.0f ",OdoCount,IntegratedHeading,MagHeading);
+		else
+			fdprintf(LCD_SER,"+%ld,%3.0f,%3.0f ",OdoCount,IntegratedHeading,MagHeading);
+		}
+		else
+			fdprintf(LCD_SER,"NO IMU NO IMU");
+
+	if((bCompassCalDirty) && (Secs>20) && ((Secs %30)==0))
+	 {
+	   SaveConfigToStorage();
+	   bCompassCalDirty=false;
+	   iprintf("Compass cal saved\r\n");
+	 }
+
+
+	  LCD_X_Y(LCD_SER,0,1);
+	  fdprintf(LCD_SER,"L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
+
+	  Lsec=Secs;
+	  LastLidar=LidarScanCount;
+	  LastImu=IMUSample;       Lsec=Secs;
+	  LastRCFrame=RCFrameCnt;
+	}
+	OSTimeDly(1);
+  }
+}
+
+
+
+
+
+
+
+bool newRC()
+{
+static uint32_t LastRCFrameCnt;
+if(RCFrameCnt!=LastRCFrameCnt)
+{
+  LastRCFrameCnt=RCFrameCnt;
+  return true;
+}
+return false;
+}
+
+bool newODO()
+{
+static uint32_t myLastODOCnt;
+if(OdoCount!=myLastODOCnt)
+{
+  myLastODOCnt=OdoCount;
+  return true;
+}
+return false;
+}
+
+
+bool newServoFrame()
+{
+static uint32_t lastServoFrameCnt;
+if(ServoFrameCnt!=lastServoFrameCnt)
+{
+lastServoFrameCnt=ServoFrameCnt;
+return true;
+}
+return false;
+}
+
+
+
+
+
+
+
+
+
 
 void UserMain(void * pd)
 {
@@ -422,9 +477,10 @@ void UserMain(void * pd)
    iprintf("*************************pop path **********************\r\n");
    PopulatePath(); 
    iprintf("*************************end path **********************\r\n");
+   iprintf("Size of a single path_element is :%ld\r\n",sizeof(path_element));
 
 
-   int LCD_SER=SimpleOpenSerial(5,9600);
+   LCD_SER=SimpleOpenSerial(5,9600);
    LCD_CLS(LCD_SER);
 
 
@@ -443,7 +499,7 @@ void UserMain(void * pd)
    Mpu9250setup(MAIN_PRIO-2);
    InitLidar(2,MAIN_PRIO-1);
    InitLogFtp(MAIN_PRIO+1);
-   //InitFileTask(MAIN_PRIO+2);
+
    ServoDriveInit();
    InitDSM2Rx(6);
    RCCallBack=ProcessNewRCPos;
@@ -490,78 +546,22 @@ void UserMain(void * pd)
    ImuMode=eRunning;
    OSTimeDly(10);
    SetInitalCompass();
-
-
-
-   uint32_t LastLidar=LidarScanCount;
-   uint32_t LastRCFrame=RCFrameCnt;
-   Lsec=Secs;
+   
    while(Lsec==Secs) asm("nop");
-   
-   
 
 
+   OSSimpleTaskCreatewName(LCD_DisplayTask,MAIN_PRIO+2,"LCD State"); 
 
-   LastImu=IMUSample;
-   Lsec=Secs;
-
-
+   pNotifyNextFrameSem=&MainTaskSem;
 
 
-   while (1)
+  while(1)
   {
+	  MainTaskSem.Pend(2);
 
-
-
-   if(charavail())
-   {switch(getchar())
-      {
-      }
-   }
-   
-
-   if(Lsec!=Secs)
+	if(newRC())
    {
-   Lsec=Secs;
-   bso.s=Secs;
-   bso.Log();
-
-   LCD_X_Y(LCD_SER,0,0);
-   /*if(nFileMode==2)
-   {
-	   writestring(LCD_SER,FileStateMsg);
-   }
-   else
-   */
-   if(bIMU_Id)
-	{if(Secs &1)
-	   fdprintf(LCD_SER,"X%ld,%3.0f,%3.0f  ",OdoCount,IntegratedHeading,MagHeading);
-   else
-	   fdprintf(LCD_SER,"+%ld,%3.0f  ",OdoCount,IntegratedHeading);
-   }
-   else
-	   fdprintf(LCD_SER,"NO IMU NO IMU");
-
-
-   if((bCompassCalDirty) && (Secs>20) && ((Secs %30)==0))
-	{
-      SaveConfigToStorage();
-	  bCompassCalDirty=false;
-	  iprintf("Compass cal saved\r\n");
-	}
-
-
-   LCD_X_Y(LCD_SER,0,1);
-   fdprintf(LCD_SER,"L:%ld:%3.0fR:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,IntegratedHeading,RCFrameCnt-LastRCFrame,GetLogPercent());
-
-   Lsec=Secs;
-   LastLidar=LidarScanCount;
-   LastImu=IMUSample;       Lsec=Secs;
-   LastRCFrame=RCFrameCnt;
-  }
-  if(RCFrameSem.Pend(1)==OS_NO_ERR)
-  {
-	static int LastActiveMode;
+     static int LastActiveMode;
 	
 	if(rc_ch[5]<700) nActiveMode=0;
      else if(rc_ch[5]<1200) nActiveMode=1;
@@ -574,6 +574,40 @@ void UserMain(void * pd)
 		}
 		LastActiveMode =nActiveMode;
     LogRC();
-  }
+   }
+
+   if(newODO())
+   {
+	 float head;
+	 static float last_head;
+     if(RunProps.UseMag)
+		 head=IntegratedHeading;
+		 else
+		 head=RawHeading;
+
+		 float dist=RunProps.ODODist;
+		 float usehead=(head+last_head)/2;
+		 float dx=dist*LookUpSinDeg(usehead);
+		 float dy=dist*LookUpCosDeg(usehead);
+		 last_head=head;
+		 Pos_x+=dx;
+     	 Pos_y+=dy;
+		 cpo.x=Pos_x;
+		 cpo.y=Pos_y;
+		 cpo.Log();
+
+   }
+
+   if(newServoFrame())
+   {
+	   if(nActiveMode==0) 
+		   SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
+		   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+
+
+   }
  }
+
+
+ 
 }

@@ -20,6 +20,7 @@ extern volatile int32_t AxisSum[3];
 
 extern volatile float MagHeading;
 extern volatile float IntegratedHeading;
+extern volatile float RawHeading;
 extern volatile bool bIMU_Id;
 
 extern volatile bool bCompassCalDirty;

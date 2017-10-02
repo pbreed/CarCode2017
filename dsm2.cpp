@@ -3,14 +3,16 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <basictypes.h>
-#include "servodrive.h"
 #include <fdprintf.h>
 #include <pins.h>
 #include <serial.h>
 #include <serinternal.h>
 #include <sim.h>
 #include <pin_irq.h>
-#include "lidar.h"
+#include <nbrtos.h>
+#include "dsm2.h"
+//#include "lidar.h"
+//#include "servodrive.h"
 
 #include "introspec.h"
 

@@ -724,7 +724,7 @@ extern volatile uint32_t LIDAR_MIN;
 extern volatile uint32_t OdoCount;
 extern volatile uint32_t DtOdoCount;
 
-void ProcessNewTick();
+void ProcessNewImuData();
 
 void IMUSampleTask(void *p)
 {
@@ -815,7 +815,7 @@ while(1)
 	 CompR.Log();
 	 }
  }
- ProcessNewTick();
+ ProcessNewImuData();
 }
 }
 
