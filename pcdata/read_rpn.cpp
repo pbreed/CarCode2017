@@ -886,7 +886,7 @@ bool bListVars;
 
 void ParseOptions(const char * arg)
 {
-printf("Parse Suboption %s\n",arg);
+//printf("Parse Suboption %s\n",arg);
     switch (arg[1])
     {
     case 'A': bEmitAll=true; break;
@@ -938,7 +938,7 @@ else
 if(bNextIsOption)
 {
   ParseOptionFile(argv[i]);
-  printf("Parsing option file %s\n",argv[i]);
+//  printf("Parsing option file %s\n",argv[i]);
   bNextIsOption=false;
 }
 else
