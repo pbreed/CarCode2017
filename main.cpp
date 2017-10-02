@@ -21,13 +21,14 @@
 #include <pin_irq.h>
 #include <intcdefs.h>
 #include <cfinter.h>
+#include <multipartpost.h>
 
 #include "servodrive.h"
 #include "introspec.h"
 #include "lidar.h"
 #include "dsm2.h"
 #include "mpu9250.h"
-
+#include "path.h"
 
 LOGFILEINFO;
 
@@ -389,9 +390,18 @@ void ModeChange(int new_mode, int prev_mode)
 
 
 extern volatile uint32_t LidarRxc;
+
+extern void RegisterPost();
+
 void UserMain(void * pd)
 {
 	initWithWeb();
+	if ( !EnableMultiPartForms( 500000 ) )
+	{
+		iprintf( "EnableMultiPartForms() initialization failed\r\n" );
+	}
+	RegisterPost();
+
 	iprintf("AVC  at  %s on %s\r\n",__TIME__,__DATE__);
 
 
@@ -408,6 +418,10 @@ void UserMain(void * pd)
    Pins[14].function(PIN_14_UART6_RXD);	//RC RX
    Pins[38].function(PIN_38_UART5_TXD); //TX to Serial LCD
 
+
+   iprintf("*************************pop path **********************\r\n");
+   PopulatePath(); 
+   iprintf("*************************end path **********************\r\n");
 
 
    int LCD_SER=SimpleOpenSerial(5,9600);
@@ -481,10 +495,13 @@ void UserMain(void * pd)
 
    uint32_t LastLidar=LidarScanCount;
    uint32_t LastRCFrame=RCFrameCnt;
-
-
    Lsec=Secs;
    while(Lsec==Secs) asm("nop");
+   
+   
+
+
+
    LastImu=IMUSample;
    Lsec=Secs;
 
