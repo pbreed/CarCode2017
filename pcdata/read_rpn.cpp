@@ -127,6 +127,7 @@ FieldName="";
 Rpn="";
 DisplayElement="";
 Field=0;
+EmitLineOnRx=false;
 
 //printf("Parsing compound name %s\r\n",compound_name);
 const char * cp=compound_name;
@@ -169,7 +170,7 @@ dname=ObjName+'.'+FieldName;
 
 if((strstr(cp,"emit")) || (bEmitAll))
 {
-//printf("Emit set to tru for %s\r\n",dname.c_str());
+//fprintf(stderr,"Emit set to tru for %s EA:%d\r\n",dname.c_str(),bEmitAll);
 EmitLineOnRx=true;
 }
 
@@ -256,7 +257,6 @@ void DisplayItem::ObjectEnd()
         if(pEventDisplay) pEventDisplay->DisplayElement="";
        }
 
-      bEmitDataLine=false;
 		
 	      pd=pDisplayHead;
 		  while(pd)
@@ -265,6 +265,7 @@ void DisplayItem::ObjectEnd()
 			 if(pd->Field) pd->Field->display_value="";
 		     pd=pd->pNext;
 		   }
+          bEmitDataLine=false;
 	
    }
 }
@@ -281,6 +282,8 @@ while(pd)
 	fd->bDoDisplay=true;
     if(pd->EmitLineOnRx)
     {
+    // fprintf(stderr,"Setting emit on  %s\n",fd->name.c_str());
+
      fd->bEmitField=true;
     }
 //    printf("Attached %s.%s to fd\n",po->name.c_str(),fd->name.c_str());
@@ -421,12 +424,8 @@ void FieldDescription::NumShow(unsigned char * pD, int len,bool issigned)
    }
    sprintf (buffer,"%u",(unsigned)v);
   }
+  display_value=buffer;
 
-   if ((bDataOn) && (bDoDisplay))
-   {
-	display_value=buffer;
-	DisplayItem::bEmitDataLine|=bEmitField;
-   }
    if(gAction==eVerbose) printf(buffer);
 }
 
@@ -441,12 +440,9 @@ void FieldDescription::FloatShow(unsigned char * pD)
  pF[3]=pD[0];
  char buffer[80];
  sprintf(buffer,"%f",f);
+ display_value=buffer;
  if(gAction==eVerbose)  printf(buffer);
- if ((bDataOn) && (bDoDisplay))
- {
-  display_value=buffer;
-  DisplayItem::bEmitDataLine|=bEmitField;
- }
+
 }
 
 
@@ -464,12 +460,9 @@ void FieldDescription::DoubleShow(unsigned char * pD)
  pF[7]=pD[0];
  char buffer[80];
  sprintf(buffer,"%f",d);
- if(gAction==eVerbose)  printf(buffer);
- if ((bDataOn) && (bDoDisplay))
-{
  display_value=buffer;
- DisplayItem::bEmitDataLine|=bEmitField;
-}
+ if(gAction==eVerbose)  printf(buffer);
+
 }
 
 
@@ -487,6 +480,16 @@ if(gAction==eVerbose)  printf("%s:",name.c_str());
                 break;
     }
 if(gAction==eVerbose)  printf("\n");
+ if ((bDataOn) && (bDoDisplay))
+ {
+   if(bEmitField && !DisplayItem::bEmitDataLine)
+   {
+       //fprintf(stderr,"Emiting becuase of %s\n",name.c_str());
+
+
+   }
+  DisplayItem::bEmitDataLine|=bEmitField;
+ }
 }
 
 

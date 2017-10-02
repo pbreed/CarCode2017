@@ -10,7 +10,7 @@
 
 char * pPostPath;
 int postDataLen;
-							   
+							
 void ProcessPathPost( int sock, char *url, char *pData, char *rxBuffer)
 {
 SendHTMLHeader( sock );
@@ -48,7 +48,7 @@ void RegisterPost()
 }
 
 
-extern const unsigned long PathDataLen; 
+extern const unsigned long PathDataLen;
 extern const unsigned char PathData[];
 
 path_element PathArray[1000];
@@ -97,24 +97,21 @@ return (float)d*180.0/PI;
 
 void ParseAndPopulatePath(const char * cp)
 {
-const char * cpo;
-
 
 cp=strstr(cp,"Path");
 if(cp)
 {
 while ((*cp!='[') && (*cp)) cp++;
-if (*cp) 
+if (*cp)
  { cp++; //Go past [
-	int n=0; 
-    cpo=cp;
+	int n=0;
 	while((*cp) && (*cp!=']') && (PathArray[n].Parse(cp,n+1)))
 		{
 	
-		if(PathArray[n].m_bDoEdge)
+		if((PathArray[n].m_bDoEdge) && (n>0))
 		{
 		 Point pnext(PathArray[n].x,PathArray[n].y);
-		 Point pprev(PathArray[n-1].x,PathArray[-1].y);
+		 Point pprev(PathArray[n-1].x,PathArray[n-1].y);
 		 Point wall(PathArray[n].m_edge_x,PathArray[n].m_edge_y);
 		 Point pcenter((pnext.x+pprev.x)/2,(pnext.y+pprev.y)/2);
 		 float dist=Calc_Distance(pcenter,wall);
@@ -123,16 +120,16 @@ if (*cp)
 		 float diff=whead-head;
 		 while (diff>180) diff-=360;
 		 while (diff<-180) diff+=360;
-		 if(diff<0) 
-			 PathArray[n].m_edge_dist=dist; //+ to right, - to left 
+		 if(diff<0)
+			 PathArray[n].m_edge_dist=dist; //+ to right, - to left
 		 else
-			 PathArray[n].m_edge_dist=-dist; //+ to right, - to left 
+			 PathArray[n].m_edge_dist=-dist; //+ to right, - to left
 		}
 		
-		if(PathArray[n].m_bDoCorner)
+		if((PathArray[n].m_bDoCorner)&& (n>0))
 		{
 		 Point pnext(PathArray[n].x,PathArray[n].y);
-		 Point pprev(PathArray[n-1].x,PathArray[-1].y);
+		 Point pprev(PathArray[n-1].x,PathArray[n-1].y);
 		 Point corner(PathArray[n].m_CornerAct_X,PathArray[n].m_CornerAct_Y);
 		 Point onpath(PathArray[n].m_CornerDet_Path_X,PathArray[n].m_CornerDet_Path_Y);
 		 float dist=Calc_Distance(onpath,corner);
@@ -142,7 +139,7 @@ if (*cp)
 		 float diff=chead-head;
 		 while (diff>180) diff-=360;
 		 while (diff<-180) diff+=360;
-		 if(diff<0) 
+		 if(diff<0)
 			 PathArray[n].m_Corner_dist=-dist;
 			 else
 			 PathArray[n].m_Corner_dist=dist;
@@ -159,7 +156,7 @@ if (*cp)
 		iprintf("]\r\n");
 		PathArray[n-1].Show();
 		*/
-		}; 
+		};
     //iprintf("Parsed %d path points\r\n",n);
 	PathArray[n].m_bValid=false;
  }
@@ -169,7 +166,7 @@ if (*cp)
 void PopulatePath()
 {
 const char * cp;
-if(pPostPath) 
+if(pPostPath)
 	{cp=pPostPath;
     }
 else
@@ -190,7 +187,7 @@ void trimlead(const char * &cp)
     while(*cp)
 	{
 	 char c=*cp;
-	 if (!((isspace(c)) || (c==','))) return; 
+	 if (!((isspace(c)) || (c==','))) return;
 	 cp++;
 	}
 }
@@ -351,26 +348,26 @@ printf("[x:%4.2f, y:%4.2f] Edge %d Corner %d \r\n",x,y,m_bDoEdge,m_bDoCorner);
 
 bool path_element::Parse(const char * & cp,int def_next_seq)
 {
- 
+
 //  iprintf("\nAbout to parse starting at :[%c]\n",*cp);
-  
+
   trimlead(cp);
 
  PathInitalValue();
  next_seq=def_next_seq;
- 
+
  if(*cp!='{') return false;
  cp++;
  trimlead(cp);
- 
- 
+
+
  while((*cp) && (*cp!='}'))
  {
  if(strid(cp,"pt"))
   {
    ReadXY(cp,x,y);
   }
- 
+
  if(strid(cp,"Edgev"))
 	 {
 	   if(!nextnull(cp))
@@ -389,19 +386,19 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
 		  if(*cp!='{') return false;
 		  cp++;
 		  trimlead(cp);
-		  
+		
 		  m_bDoEdge=true;
           while((*cp) && (*cp!='}'))
 	       {
 			  if(strid(cp,"inter")) {m_edge_intercept=ReadBool(cp);}
 			  if(strid(cp,"adj_dist")) {m_edge_adj_dist=ReadBool(cp);}
-			  if(strid(cp,"adj_head")) 
+			  if(strid(cp,"adj_head"))
 				  {
 				  if (!nextnull(cp))
-					{ 
+					{
 					  ReadFNumber(cp);
 					  m_adj_head=true;
-				    } else 
+				    } else
 					{
 						m_adj_head=false;
 					}
@@ -410,7 +407,7 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
 			  if(strid(cp,"pt"))  {ReadXY(cp,m_edge_x,m_edge_y);}
 		  }
 		  if(*cp=='}') cp++;
-		  else 
+		  else
 			  {
 			  //iprintf("Bailing Early at %c,%c,%c\r\n",*cp,cp[1],cp[2]);
 			  return false;
@@ -434,12 +431,12 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
 	       {
 			  if(strid(cp,"adj_lr")) {m_bCornerAdj_LR=ReadBool(cp);}
 			  if(strid(cp,"adj_dist")){m_bCornerAdj_FA=ReadBool(cp);}
-			  if(strid(cp,"corner_pt")) 
+			  if(strid(cp,"corner_pt"))
 				  {
 				  ReadXY(cp,m_CornerAct_X,m_CornerAct_Y);
 				  }
 
-			  if(strid(cp,"path_pt")) 
+			  if(strid(cp,"path_pt"))
 				 {
 				  ReadXY(cp,m_CornerDet_Path_X,m_CornerDet_Path_Y);
 				 }
@@ -450,7 +447,7 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
 		 }
 		  //init value handled the null
      }
- 
+
  if(strid(cp,"next_seq"))
 	 {
 	 if(!nextnull(cp))
@@ -463,11 +460,11 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
  if(strid(cp,"bStop")){if(ReadBool(cp)) next_seq=-1;}
  if(strid(cp,"Speed"))
 	 {
-	 trimlead(cp); 
+	 trimlead(cp);
 	 if (!nextnull(cp))
-	 { 
+	 {
 		 speed=ReadFNumber(cp);
-	 } else 
+	 } else
 		 speed=-1;
 
      }
@@ -475,7 +472,7 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
 // ShowData((uint8_t *)cp,20);
  }
  trimlead(cp);
- if(*cp=='}') 
+ if(*cp=='}')
 	{ cp++;
        m_bValid=true;
     }

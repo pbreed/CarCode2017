@@ -8,26 +8,26 @@ using namespace std;
 
 /*
 +  r0 <- r1+r0 pop one
--  r0 <- r1-r0 pop one 
-/  r0 <- r1/r0 pop one 
-*  r0 <- r1*r0 pop one 
-^  r0 <- r1^r0 pop one 
-<  r0 <- if(r0<r1) r0->1 else 0 pop one 
->  r0 <- if(r0>r1) r0->1 else 0 pop one 
-=  r0 <- if(r0==r1) r0->1 else 0 pop one 
+-  r0 <- r1-r0 pop one
+/  r0 <- r1/r0 pop one
+*  r0 <- r1*r0 pop one
+^  r0 <- r1^r0 pop one
+<  r0 <- if(r0<r1) r0->1 else 0 pop one
+>  r0 <- if(r0>r1) r0->1 else 0 pop one
+=  r0 <- if(r0==r1) r0->1 else 0 pop one
 push push r1->r0
 pop  r0-<r1 pop one
-swap swap ro,r1 
+swap swap ro,r1
 neg r0<- -r0
 sin	  r0 <-  sin(r0)
-cos   r0 <-  cos(r0) 
-tan   r0 <-  tan(r0) 
-asin  r0 <-  asin(r0) 
-acos  r0 <-  acos(r0) 
-atan  r0 <-  atan(r0) 
-atan2 r0 <-  atan2(r0) 
-log   r0 <-  log(r0) 
-ln    r0 <-  ln(r0) 
+cos   r0 <-  cos(r0)
+tan   r0 <-  tan(r0)
+asin  r0 <-  asin(r0)
+acos  r0 <-  acos(r0)
+atan  r0 <-  atan(r0)
+atan2 r0 <-  atan2(r0)
+log   r0 <-  log(r0)
+ln    r0 <-  ln(r0)
 pi	  ro-<pi
 #number ->  push r0 <- atof number
 */
@@ -52,32 +52,32 @@ val=atof(cp);
 }
 else
 {
-switch (s[0]) 
+switch (s[0])
 {
 case '+': rv=eadd; break;
-case '-': rv=esub; break; 
-case '/': rv=ediv; break; 
-case '*': rv=emul; break; 
-case '^': rv=epow; break; 
-case '<': rv=elt; break; 
-case '>': rv=egt; break; 
-case '=': rv=eeq; break; 
-case 'c': rv=ecos;break; 
+case '-': rv=esub; break;
+case '/': rv=ediv; break;
+case '*': rv=emul; break;
+case '^': rv=epow; break;
+case '<': rv=elt; break;
+case '>': rv=egt; break;
+case '=': rv=eeq; break;
+case 'c': rv=ecos;break;
 case '#': rv=eval; break;
 case 'a':
 	      if(s[1]=='n') {rv=eand; break; }
 	      if(s[1]=='s') {rv=easin; break; }
 	      if(s[1]=='c') {rv=eacos; break; }
-	      if(s[1]=='t') 
+	      if(s[1]=='t')
 			  {
-			   if(s[4]=='2') rv=eatan2; else rv=eatan; break; 
+			   if(s[4]=='2') rv=eatan2; else rv=eatan; break;
 			  }
 		  break;
 case 'l':
 	if(s[1]=='n') {rv=eln; break; }
 	if(s[1]=='o') {rv=elog; break; }
 	break;
-case 'n': 
+case 'n':
 	if(s[1]=='o') {rv=enot; break; }
 	if(s[1]=='e') {rv=eneg; break; }
 	break;
@@ -102,9 +102,9 @@ val=atof(s.c_str());
 
 }
 
-s=s.substr(1,string::npos); 
+s=s.substr(1,string::npos);
 
-while ((!s.empty()) && (s[0]!=' ')) s=s.substr(1,string::npos); 
+while ((!s.empty()) && (s[0]!=' ')) s=s.substr(1,string::npos);
 
 return rv;
 }
@@ -118,32 +118,32 @@ for(int i=1; i<15; i++) stack[i]=stack[i+1];
 
 const char * TokName(Token t)
 {
-switch(t) 
-{         
-case eadd: return "add";  
-case esub: return "sub"; 
-case ediv: return "div"; 
-case emul: return "mul"; 
-case epow: return "pow"; 
-case elt:  return "lt";  
-case egt:  return "gt";  
-case eeq:  return "eq";  
-case epush: return "pus"; 
-case epop: return "pop"; 
-case eswp: return "swp"; 
-case eneg: return "neg"; 
-case esin: return "sin"; 
-case ecos: return "cos"; 
-case etan: return "tan"; 
+switch(t)
+{
+case eadd: return "add";
+case esub: return "sub";
+case ediv: return "div";
+case emul: return "mul";
+case epow: return "pow";
+case elt:  return "lt";
+case egt:  return "gt";
+case eeq:  return "eq";
+case epush: return "pus";
+case epop: return "pop";
+case eswp: return "swp";
+case eneg: return "neg";
+case esin: return "sin";
+case ecos: return "cos";
+case etan: return "tan";
 case easin: return "asin";
-case eacos: return "acos"; 
-case eatan: return "atan"; 
-case eatan2: return "atan2"; 
-case elog: return "log"; 
-case eln:  return "ln";  
-case epi:  return "pi";  
-case eval: return "val"; 
-case eeof: return "eof"; 
+case eacos: return "acos";
+case eatan: return "atan";
+case eatan2: return "atan2";
+case elog: return "log";
+case eln:  return "ln";
+case epi:  return "pi";
+case eval: return "val";
+case eeof: return "eof";
 case enop: return "nop";
 case enot: return "not";
 case eand: return "and";
@@ -157,7 +157,8 @@ return "??";
 string Eval(const string & s, const string & rpn)
 {
 double d=atof(s.c_str());
-for(int i=0; i<16; i++) stack[i]=0;
+int i;
+for(i=0; i<16; i++) stack[i]=0;
 stack[0]=d;
 
 //printf("starting v=%g for %s\n",d,s.c_str());
@@ -178,7 +179,7 @@ case epow: stack[0]=pow(stack[1],stack[0]); popat1(); break;
 case elt: if(stack[0]<stack[1]) stack[0]=1; else stack[0]=0; popat1(); break;
 case egt: if(stack[0]>stack[1]) stack[0]=1; else stack[0]=0; popat1(); break;
 case eeq: if(stack[0]==stack[1]) stack[0]=1; else stack[0]=0; popat1(); break;
-case epush: for(int i=15; i>0; i--) stack[i]=stack[i-1]; break;
+case epush: for(i=15; i>0; i--) stack[i]=stack[i-1]; break;
 case epop: stack[0]=stack[1]; popat1(); break;
 
 case eswp: val=stack[0]; stack[0]=stack[1]; stack[1]=val; break;
@@ -192,8 +193,8 @@ case eatan:stack[0]=atan(stack[0]); break;
 case eatan2:stack[0]=atan2(stack[0],stack[1]); popat1(); break;
 case elog: stack[0]=log10(stack[0]); break;
 case eln: stack[0]=log(stack[0]); break;
-case epi:  for(int i=15; i>0; i--) stack[i]=stack[i-1]; stack[0]=3.141592654; break;
-case eval: for(int i=15; i>0; i--) stack[i]=stack[i-1]; stack[0]=val; break;
+case epi:  for(i=15; i>0; i--) stack[i]=stack[i-1]; stack[0]=3.141592654; break;
+case eval: for(i=15; i>0; i--) stack[i]=stack[i-1]; stack[0]=val; break;
 case eor: if((stack[0]!=0) || (stack[1]!=0)) stack[0]=1; else stack[0]=0; popat1(); break;
 case eand: if((stack[0]!=0) && (stack[1]!=0)) stack[0]=1; else stack[0]=0; popat1(); break;
 case enot: if((stack[0]!=0)) stack[0]=0; else stack[0]=1; popat1(); break;

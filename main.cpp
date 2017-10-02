@@ -22,6 +22,7 @@
 #include <intcdefs.h>
 #include <cfinter.h>
 #include <multipartpost.h>
+#include <math.h>
 
 #include "SinLookup.h"
 #include "servodrive.h"
@@ -108,12 +109,12 @@ INTERRUPT(LIDAR_ISR,0x2700)
 	else
 		if(bLIDAR_MODE==2)
 		{
-		 
+		
 			sim2.timer[3].tmr=0x0043;   // 0000 0000 01 0 0 0 0 1 1 //Rising edge
 			bLIDAR_MODE=1;
-			uint32_t v=sim2.timer[3].tcr;      
+			uint32_t v=sim2.timer[3].tcr;
 			LIDAR_VALUE=(v-LIDAR_LAST_START);
-			if (LIDAR_VALUE<LIDAR_MIN) 
+			if (LIDAR_VALUE<LIDAR_MIN)
 			{
 			 LIDAR_MIN=LIDAR_VALUE;
 			}
@@ -174,14 +175,14 @@ static uint32_t LastCount;
 	
 	   case 2: break; //Throttle
 
-	   case 3: break; //Rudder 
+	   case 3: break; //Rudder
 
 	   case 4: //Gear Switch
 		   if(v<1024) bLog=false;
 		   else
 			          bLog=true;
 		   break;
-	   
+	
 	   case 5: //nActiveMode
 		     break;
 
@@ -297,8 +298,8 @@ const float min_steer =-0.6;
 void Steer()
 {
  static float ierr;
-  
- float err=(TargetHeading-IntegratedHeading); 
+
+ float err=(TargetHeading-IntegratedHeading);
  if(err>180) err-=360;
  if(err<-180) err+=360;
 
@@ -306,7 +307,7 @@ void Steer()
 
  if(sv>max_steer) sv=max_steer;
  if(sv<min_steer) sv=min_steer;
- 
+
  slo.t=TargetHeading;
  slo.e=err;
 
@@ -475,7 +476,7 @@ void UserMain(void * pd)
 
 
    iprintf("*************************pop path **********************\r\n");
-   PopulatePath(); 
+   PopulatePath();
    iprintf("*************************end path **********************\r\n");
    iprintf("Size of a single path_element is :%ld\r\n",sizeof(path_element));
 
@@ -495,7 +496,7 @@ void UserMain(void * pd)
    LogFileVersions();
    LogAppRecords();
 
-   InitTimer3();   
+   InitTimer3();
    Mpu9250setup(MAIN_PRIO-2);
    InitLidar(2,MAIN_PRIO-1);
    InitLogFtp(MAIN_PRIO+1);
@@ -534,23 +535,23 @@ void UserMain(void * pd)
       OSTimeDly(TICKS_PER_SECOND);
       LCD_X_Y(LCD_SER,0,0);
         fdprintf(LCD_SER,"Cal: %ld of %ld ",(Lsec-Secs),(int)RunProps.CalTime );
-      printf("Cal: %ld of %ld \r\n",(Secs-Lsec),(int)RunProps.CalTime );
+      printf("Cal: %ld of %d \r\n",(Secs-Lsec),(int)RunProps.CalTime );
    }
 
    while(Secs==(Lsec+11)) asm(" nop");
 
-   LCD_CLS(LCD_SER); 
+   LCD_CLS(LCD_SER);
    iprintf("Samples=%ld DT=%ld\r\n",IMUSample-LastImu, Secs-(Lsec+1));
 
    iprintf("GZ[2]=%ld n=%ld off=%ld\r\n",GZero[2], ZeroCount,GZero[2]/ZeroCount);
    ImuMode=eRunning;
    OSTimeDly(10);
    SetInitalCompass();
-   
+
    while(Lsec==Secs) asm("nop");
 
 
-   OSSimpleTaskCreatewName(LCD_DisplayTask,MAIN_PRIO+2,"LCD State"); 
+   OSSimpleTaskCreatewName(LCD_DisplayTask,MAIN_PRIO+2,"LCD State");
 
    pNotifyNextFrameSem=&MainTaskSem;
 
@@ -586,7 +587,14 @@ void UserMain(void * pd)
 		 head=RawHeading;
 
 		 float dist=RunProps.ODODist;
-		 float usehead=(head+last_head)/2;
+
+         //Can't average headings...s
+         float usehead=(head+last_head)/2;
+         if(fabs(head-last_head) > 180.0)
+         {
+          usehead-=180.0;
+         }
+
 		 float dx=dist*LookUpSinDeg(usehead);
 		 float dy=dist*LookUpCosDeg(usehead);
 		 last_head=head;
@@ -600,7 +608,7 @@ void UserMain(void * pd)
 
    if(newServoFrame())
    {
-	   if(nActiveMode==0) 
+	   if(nActiveMode==0)
 		   SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
 		   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
 
@@ -609,5 +617,5 @@ void UserMain(void * pd)
  }
 
 
- 
+
 }
