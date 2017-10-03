@@ -280,7 +280,7 @@ uint32_element pc{"pointcnt"};
 uint32_element dt{"dt"};
 uint32_element sn{"sn"};
 uint32_element tc{"tc"};
-uint32_element b{"b"};
+int32_element b{"b"};
 END_INTRO_OBJ;
 
 
@@ -597,7 +597,7 @@ void UserMain(void * pd)
           usehead-=180.0;
          }
 
-		 bLidarRight=false;
+		 bLidarLeft=false;
 		 float dx=dist*LookUpSinDeg(usehead);
 		 float dy=dist*LookUpCosDeg(usehead);
 		 last_head=head;
@@ -615,7 +615,7 @@ void UserMain(void * pd)
 		 uint32_t t2=sim2.timer[3].tcn; 
 		 LidarPointCount=0;
 		 cpo.dt=(t2-t1);
-		 bLidarRight=true;
+		 bLidarLeft=true;
 
 		 cpo.Log();
    }
@@ -635,7 +635,8 @@ void UserMain(void * pd)
 }
 
 uint32_t LineSlopeCount[256];
-int32_t  BSum[256];
+long long  BSum[256];
+
 
 uint32_t ProcessLidarLines(int32_t & b,uint32_t &tc)
 {
@@ -650,7 +651,7 @@ if(n<10) //Need at least 10 points
 }
 
 bzero(LineSlopeCount,256*sizeof(uint32_t));
-bzero(BSum,256*sizeof(int32_t));
+bzero(BSum,256*sizeof(BSum[0]));
 for (uint32_t i=0; i<(n-1); i++)
 	for( uint32_t j=i+1; j<n; j++)
 	{
@@ -678,21 +679,42 @@ for (uint32_t i=0; i<(n-1); i++)
 	   }
 	 }
 	}
-	tc=total_counted;
+if(total_counted>5)
+{
+ tc=total_counted;
 //Now find Median value 
 
-n=0;
-total_counted/=2;
+ n=0;
+ total_counted/=2;
 
 for(int i=0; i<256; i++)
 {
-n+=LineSlopeCount[i];
+ n+=LineSlopeCount[i];
 
-if(n>=(total_counted)) 
- {
-   b=BSum[i]/LineSlopeCount[i];
-   return i;
- }
+ if(n>=(total_counted)) 
+  {
+	if(i>1)
+	{
+	 //Find the greatest i-1,i,i+1
+	 if(LineSlopeCount[i-1]>LineSlopeCount[i+1])
+	 {
+		 if(LineSlopeCount[i-1]>LineSlopeCount[i])
+		 i--;
+	 }
+	 else
+	 {
+		 if(LineSlopeCount[i+1]>LineSlopeCount[i])
+			 i++;
+	 }
+	}
+	if(LineSlopeCount[i]!=0) 
+	{
+     b=BSum[i]/LineSlopeCount[i];
+    return i;
+	}
+	return 256;
+  }
+}
 }
 return 256;
 }
