@@ -311,7 +311,7 @@ uint8_t I2CWriteReadBuffer(uint8_t address, uint8_t writeVal, uint8_t *buffer, i
         return status;
     }
 
-    status = I2CReadBuf(address,buffer, readLength, true);
+   status = I2CReadBuf(address,buffer, readLength, true);
 
     if((status >= I2C_NEXT_WRITE_OK) && (status <= I2C_MASTER_OK))
     {
@@ -400,15 +400,26 @@ void Mpu9250setup(int TaskPrio)
 
   if (c != 0x71) // WHO_AM_I should always be 0x71
   {
-   OSTimeDly(2);
-   I2CStop();
-   OSTimeDly(2);
+      iprintF("Attempting to unclod I2C bus\r\n");
+      Pins[27].function(PIN_27_GPIO);//I2C for IMU
+      Pins[29].function(PIN_29_GPIO);//I2C For IMU
+      Pins[29].hiz();
+
+      for(int i=0; i<256; i++)
+      {
+         Pins[27]=1;
+         for (volatile int d=0; d<100; d++) asm(" nop");
+         Pins[27]=0;
+         for (volatile int d=0; d<100; d++) asm(" nop");
+      }
+
+
+
+   Pins[27].function(PIN_27_I2C0_SCL    );//I2C for IMU
+   Pins[29].function(PIN_29_I2C0_SDA    );//I2C For IMU
    I2CResetPeripheral();
    OSTimeDly(2);
-   I2CStop();
-   OSTimeDly(2);
-   I2CStop();
-    c = ReadReg(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
+   c = ReadReg(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
    iprintf("Retry ID=%02X\r\n",(int)c);
    if(c!=0x71) ScanI2C();
   }
@@ -419,7 +430,7 @@ void Mpu9250setup(int TaskPrio)
   {
 	  bIMU_Id=true;
     iprintf("MPU9250 is online...");
-			 
+			
     initMPU9250();
 	PirqSem.Init();
 
@@ -721,12 +732,12 @@ if(compass_cal.bUpdateRec)
 {
 
 if(CompassResult[0] >compass_cal.MaxC0) {compass_cal.MaxC0=CompassResult[0]; bCompassCalDirty=true; }
-if(CompassResult[1] >compass_cal.MaxC1) {compass_cal.MaxC1=CompassResult[1]; bCompassCalDirty=true; } 
-if(CompassResult[2] >compass_cal.MaxC2) {compass_cal.MaxC2=CompassResult[2]; bCompassCalDirty=true; } 
+if(CompassResult[1] >compass_cal.MaxC1) {compass_cal.MaxC1=CompassResult[1]; bCompassCalDirty=true; }
+if(CompassResult[2] >compass_cal.MaxC2) {compass_cal.MaxC2=CompassResult[2]; bCompassCalDirty=true; }
 
-if(CompassResult[0] <compass_cal.MinC0) {compass_cal.MinC0=CompassResult[0]; bCompassCalDirty=true; } 
-if(CompassResult[1] <compass_cal.MinC1) {compass_cal.MinC1=CompassResult[1]; bCompassCalDirty=true; } 
-if(CompassResult[2] <compass_cal.MinC2) {compass_cal.MinC2=CompassResult[2]; bCompassCalDirty=true; } 
+if(CompassResult[0] <compass_cal.MinC0) {compass_cal.MinC0=CompassResult[0]; bCompassCalDirty=true; }
+if(CompassResult[1] <compass_cal.MinC1) {compass_cal.MinC1=CompassResult[1]; bCompassCalDirty=true; }
+if(CompassResult[2] <compass_cal.MinC2) {compass_cal.MinC2=CompassResult[2]; bCompassCalDirty=true; }
 
 }
 MagHeading=CalcMagHeading();
@@ -847,11 +858,11 @@ while(1)
 	 USER_EXIT_CRITICAL();
 	 ProcessCompassResults();
 	 CompR.mx=CompassResult[0];
-     CompR.my=CompassResult[1]; 
-	 CompR.mz=CompassResult[2]; 
+     CompR.my=CompassResult[1];
+	 CompR.mz=CompassResult[2];
 	 CompR.mh=MagHeading;
-//	 CompR.li=LastIerror; 
-//	 CompR.lf=lferror; 
+//	 CompR.li=LastIerror;
+//	 CompR.lf=lferror;
 	 CompR.Log();
 	 }
  }
@@ -874,7 +885,7 @@ float CalcMagHeading()
 {
 float y=MScale(CompassResult[0],compass_cal.MaxC0,compass_cal.MinC0);
 float x=MScale(CompassResult[1],compass_cal.MaxC1,compass_cal.MinC1);
-float a=Fast_atan2(y,x);             
+float a=Fast_atan2(y,x);
 return a*180.0/3.141592654;
 }
 
