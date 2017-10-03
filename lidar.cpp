@@ -8,12 +8,18 @@
 #include <nbrtos.h>
 #include "introspec.h"
 #include "Lidar.h"
-
+#include "SinLookup.h"
 
 LOGFILEINFO;
 
 
 
+
+
+volatile IntPoint LidarPointSet[MAX_LIDAR_POINTS];
+volatile uint32_t LidarPointCount;
+volatile bool bLidarRight;
+volatile bool bLidarLeft;
 
 
 
@@ -109,6 +115,21 @@ inline void LIDAR_ProcessChar(uint8_t c)
 			   int index=((a/128)%360);
 			   if(ss>0)
 			   {
+				   if(
+					  ((bLidarRight) && (index >45) && (index<135))
+					  ||
+					  ((bLidarLeft) && (index >135) && (index<315))
+					  )
+				   {
+					   int x=(int)(AX128ToSinCosInIn[a][0]*(float)d);
+					   int y=(int)(AX128ToSinCosInIn[a][1]*(float)d);
+					   uint32_t n=(LidarPointCount& 0xFF);
+					   LidarPointCount++;
+					   LidarPointSet[n].x=x;
+					   LidarPointSet[n].y=y;
+				   }
+
+
 				  if (ssResult[index]<ss)
 				  {
 					  ssResult[index]=ss;
@@ -169,3 +190,8 @@ void InitLidar(int port, int TaskPrio)
 
 
 }
+
+
+
+
+

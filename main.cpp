@@ -276,6 +276,11 @@ END_INTRO_OBJ;
 START_INTRO_OBJ(CurPosObj,"POS")
 float_element x{"x"};
 float_element y{"y"};
+uint32_element pc{"pointcnt"};
+uint32_element dt{"dt"};
+uint32_element sn{"sn"};
+uint32_element tc{"tc"};
+uint32_element b{"b"};
 END_INTRO_OBJ;
 
 
@@ -358,7 +363,6 @@ void LCD_DisplayTask(void * pd)
 	uint32_t LastLidar=LidarScanCount;
 	uint32_t LastRCFrame=RCFrameCnt;
 	uint32_t Lsec=Secs;
-    uint32_t LastImu=IMUSample;
 
 	while (1)
    {//Main processing loop
@@ -393,7 +397,6 @@ void LCD_DisplayTask(void * pd)
 
 	  Lsec=Secs;
 	  LastLidar=LidarScanCount;
-	  LastImu=IMUSample;       Lsec=Secs;
 	  LastRCFrame=RCFrameCnt;
 	}
 	OSTimeDly(1);
@@ -447,6 +450,7 @@ return false;
 
 
 
+uint32_t ProcessLidarLines(int32_t &b,uint32_t &tc);
 
 
 void UserMain(void * pd)
@@ -524,9 +528,8 @@ void UserMain(void * pd)
    fdprintf(LCD_SER,"%s",__DATE__);
    LCD_X_Y(LCD_SER,0,1);
    fdprintf(LCD_SER,"%s",__TIME__);
-
-
    OSTimeDly(40);
+
 
 
 
@@ -538,7 +541,6 @@ void UserMain(void * pd)
       printf("Cal: %ld of %d \r\n",(Secs-Lsec),(int)RunProps.CalTime );
    }
 
-   while(Secs==(Lsec+11)) asm(" nop");
 
    LCD_CLS(LCD_SER);
    iprintf("Samples=%ld DT=%ld\r\n",IMUSample-LastImu, Secs-(Lsec+1));
@@ -586,7 +588,7 @@ void UserMain(void * pd)
 		 else
 		 head=RawHeading;
 
-		 float dist=RunProps.ODODist;
+		 float dist=(float)RunProps.ODODist;
 
          //Can't average headings...s
          float usehead=(head+last_head)/2;
@@ -595,6 +597,7 @@ void UserMain(void * pd)
           usehead-=180.0;
          }
 
+		 bLidarRight=false;
 		 float dx=dist*LookUpSinDeg(usehead);
 		 float dy=dist*LookUpCosDeg(usehead);
 		 last_head=head;
@@ -602,8 +605,19 @@ void UserMain(void * pd)
      	 Pos_y+=dy;
 		 cpo.x=Pos_x;
 		 cpo.y=Pos_y;
-		 cpo.Log();
+		 uint32_t t1=sim2.timer[3].tcn; 
+		 uint32_t tc=0;
+		 int32_t b;
+		 cpo.pc=LidarPointCount;
+		 cpo.sn=ProcessLidarLines(b,tc);
+		 cpo.tc=tc;
+		 cpo.b=b;
+		 uint32_t t2=sim2.timer[3].tcn; 
+		 LidarPointCount=0;
+		 cpo.dt=(t2-t1);
+		 bLidarRight=true;
 
+		 cpo.Log();
    }
 
    if(newServoFrame())
@@ -619,3 +633,69 @@ void UserMain(void * pd)
 
 
 }
+
+uint32_t LineSlopeCount[256];
+int32_t  BSum[256];
+
+uint32_t ProcessLidarLines(int32_t & b,uint32_t &tc)
+{
+uint32_t n=LidarPointCount;
+if(n>256) n=256;
+uint32_t total_counted=0;
+
+if(n<10) //Need at least 10 points
+{
+ tc=0;
+ return 0;
+}
+
+bzero(LineSlopeCount,256*sizeof(uint32_t));
+bzero(BSum,256*sizeof(int32_t));
+for (uint32_t i=0; i<(n-1); i++)
+	for( uint32_t j=i+1; j<n; j++)
+	{
+	 int dx=LidarPointSet[i].x-LidarPointSet[j].x;
+	 int dy=LidarPointSet[i].y-LidarPointSet[j].y;
+	 if(dy!=0)
+	 { //dx is left right
+	   //dy fore aft
+       //dx/dy = slope only care about -1 to +1  
+	   //Or +/- 45 degrees    scaled to 0 to 256
+	   //  x=my+b
+	   //X1=my1+b
+	   //m=dx/dy
+	   //X1=dxy1/dy +b
+	   //B=X1-(DX*Y1/Dy)
+	  
+	  int slope=(dx*128)/dy;  //+1==128 -1==-128
+	  
+	  if((slope>=-128) && (slope<=127))
+	   {
+         LineSlopeCount[slope+128]++;
+		 //B=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy); 
+		 BSum[slope+128]+=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy); 
+		 total_counted++;
+	   }
+	 }
+	}
+	tc=total_counted;
+//Now find Median value 
+
+n=0;
+total_counted/=2;
+
+for(int i=0; i<256; i++)
+{
+n+=LineSlopeCount[i];
+
+if(n>=(total_counted)) 
+ {
+   b=BSum[i]/LineSlopeCount[i];
+   return i;
+ }
+}
+return 256;
+}
+
+
+
