@@ -518,6 +518,7 @@ void UserMain(void * pd)
 
    uint32_t LastImu=IMUSample;
 
+ 
    while(!bIMU_Id)
    {
 	   LCD_X_Y(LCD_SER,0,0);

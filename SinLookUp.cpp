@@ -1,3 +1,4 @@
+#include <math.h>
 
 const float SinQuadTable[65536]={
 0.00000000000000000000,0.00002396844980841822,0.00004793689960306688,0.00007190534937017644,0.00009587379909597735,0.00011984224876670002,0.00014381069836857496,0.00016777914788783258,0.00019174759731070329,0.00021571604662341760,0.00023968449581220595,0.00026365294486329873,0.00028762139376292651,0.00031158984249731960,0.00033555829105270853,0.00035952673941532366,
@@ -50235,6 +50236,65 @@ unsigned long index=(deg*131072.0/180.0);
 index+=0x10000;//Cos is just sin(x+90)
 return CoreSinLookup(index);
 }
+
+float Q_rsqrt( float number )
+{
+	long i;
+	float x2, y;
+	const float threehalfs = 1.5F;
+
+	x2 = number * 0.5F;
+	y  = number;
+	i  = * ( long * ) &y;                       // evil floating point bit level hacking
+	i  = 0x5f3759df - ( i >> 1 );               // what the fuck? 
+	y  = * ( float * ) &i;
+	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
+	return y;
+}
+
+void Normalize(float &x, float &y)
+{
+  float mag=(x*x)+(y*y);
+  if(mag!=0)
+  {
+   mag=Q_rsqrt(mag);
+   x*=mag;
+   y*=mag;
+  }
+}
+
+
+#define PI_FLOAT     3.14159265f
+#define PIBY2_FLOAT  1.5707963f
+// |error| < 0.005
+float Fast_atan2( float y, float x )
+{
+	if ( x == 0.0f )
+	{
+		if ( y > 0.0f ) return PIBY2_FLOAT;
+		if ( y == 0.0f ) return 0.0f;
+		return -PIBY2_FLOAT;
+	}
+	float atan;
+	float z = y/x;
+	if ( fabs( z ) < 1.0f )
+	{
+		atan = z/(1.0f + 0.28f*z*z);
+		if ( x < 0.0f )
+		{
+			if ( y < 0.0f ) return atan - PI_FLOAT;
+			return atan + PI_FLOAT;
+		}
+	}
+	else
+	{
+		atan = PIBY2_FLOAT - z/(z*z + 0.28f);
+		if ( y < 0.0f ) return atan - PI_FLOAT;
+	}
+	return atan;
+}
+
+
 
 /*
 // Test Code 

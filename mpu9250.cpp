@@ -11,7 +11,7 @@
 #include <config_obj.h>
 #include "introspec.h"
 #include "MPU9250.h"
-
+#include "SinLookUp.h"
 
 LOGFILEINFO;
 
@@ -410,7 +410,7 @@ void Mpu9250setup(int TaskPrio)
    I2CStop();
     c = ReadReg(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
    iprintf("Retry ID=%02X\r\n",(int)c);
-
+   if(c!=0x71) ScanI2C();
   }
 
 
@@ -671,8 +671,42 @@ case eIdle:
 }
 
 
+/*static float SinSum;
+static float CosSum;
+static int MagCalCount;
+*/
+void DoCalMagHeading(float f)
+{
+/* SinSum+=LookUpSinDeg(f);
+ CosSum+=LookUpCosDeg(f);
+ MagCalCount++;
+*/
+}
 
-extern volatile int nActiveMode;// 340 1025 1780 Ch 5
+void SetInitalCompass()
+{
+/*float dx=SinSum;
+float dy=CosSum;
+uint32_t n=MagCalCount;
+dx/=n;
+dy/=n;
+dx=Fast_atan2(dy,dx);
+dx*=180.0/3.141592654;
+dy=dx;
+dx*=200.0*32768.0/250.0;
+GAxisSum[2]=(int32_t)dx;
+*/
+double a=MagHeading;
+a*=-(200*32768.0)/250.0;
+int32_t iv=(int)a;
+GAxisSum[2]=iv;
+//printf("Set inital heading to %g and %g for %d\r\n",dy,DegScale(GAxisSum[2]),n);
+printf("MagHeading=%g %g\r\n",MagHeading, DegScale(GAxisSum[2]));
+}
+
+
+
+
 
 
 void SetGyroCompass(int Slew_Seec);
@@ -696,6 +730,12 @@ if(CompassResult[2] <compass_cal.MinC2) {compass_cal.MinC2=CompassResult[2]; bCo
 
 }
 MagHeading=CalcMagHeading();
+
+if(ImuMode==eCalibrating)
+{
+	DoCalMagHeading(MagHeading);
+}
+
 
 
 
@@ -832,9 +872,9 @@ float MScale(int16_t iv,int16_t maxv, int16_t minv)
 
 float CalcMagHeading()
 {
-float x=MScale(CompassResult[0],compass_cal.MaxC0,compass_cal.MinC0);
-float y=MScale(CompassResult[1],compass_cal.MaxC1,compass_cal.MinC1);
-float a=atan2(x,y);             
+float y=MScale(CompassResult[0],compass_cal.MaxC0,compass_cal.MinC0);
+float x=MScale(CompassResult[1],compass_cal.MaxC1,compass_cal.MinC1);
+float a=Fast_atan2(y,x);             
 return a*180.0/3.141592654;
 }
 
@@ -849,12 +889,6 @@ dv*=(250.0/32768.0);//rate
 return -dv;
 }
 
-void SetInitalCompass()
-{
-double dv=MagHeading;
-dv*=200.0*32768.0/250.0;
-GAxisSum[2]=(int32_t)dv;
-}
 
 void SetGyroCompass(int Slew_Sec)
 {
