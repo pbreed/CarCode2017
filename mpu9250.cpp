@@ -400,7 +400,7 @@ void Mpu9250setup(int TaskPrio)
 
   if (c != 0x71) // WHO_AM_I should always be 0x71
   {
-      iprintF("Attempting to unclod I2C bus\r\n");
+      iprintf("Attempting to unclod I2C bus\r\n");
       Pins[27].function(PIN_27_GPIO);//I2C for IMU
       Pins[29].function(PIN_29_GPIO);//I2C For IMU
       Pins[29].hiz();

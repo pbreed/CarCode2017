@@ -464,6 +464,10 @@ void UserMain(void * pd)
 
 	iprintf("AVC  at  %s on %s\r\n",__TIME__,__DATE__);
 
+    uint32_t ttn=TimeTick;
+    SetUpTables();
+    iprintf("Table init Took %ld ticks\r\n",TimeTick-ttn);
+
 
    Pins[27].function(PIN_27_I2C0_SCL    );//I2C for IMU
    Pins[29].function(PIN_29_I2C0_SDA    );//I2C For IMU
@@ -518,7 +522,7 @@ void UserMain(void * pd)
 
    uint32_t LastImu=IMUSample;
 
- 
+
    while(!bIMU_Id)
    {
 	   LCD_X_Y(LCD_SER,0,0);
@@ -606,14 +610,14 @@ void UserMain(void * pd)
      	 Pos_y+=dy;
 		 cpo.x=Pos_x;
 		 cpo.y=Pos_y;
-		 uint32_t t1=sim2.timer[3].tcn; 
+		 uint32_t t1=sim2.timer[3].tcn;
 		 uint32_t tc=0;
 		 int32_t b;
 		 cpo.pc=LidarPointCount;
 		 cpo.sn=ProcessLidarLines(b,tc);
 		 cpo.tc=tc;
 		 cpo.b=b;
-		 uint32_t t2=sim2.timer[3].tcn; 
+		 uint32_t t2=sim2.timer[3].tcn;
 		 LidarPointCount=0;
 		 cpo.dt=(t2-t1);
 		 bLidarLeft=true;
@@ -661,21 +665,21 @@ for (uint32_t i=0; i<(n-1); i++)
 	 if(dy!=0)
 	 { //dx is left right
 	   //dy fore aft
-       //dx/dy = slope only care about -1 to +1  
+       //dx/dy = slope only care about -1 to +1
 	   //Or +/- 45 degrees    scaled to 0 to 256
 	   //  x=my+b
 	   //X1=my1+b
 	   //m=dx/dy
 	   //X1=dxy1/dy +b
 	   //B=X1-(DX*Y1/Dy)
-	  
+	
 	  int slope=(dx*128)/dy;  //+1==128 -1==-128
-	  
+	
 	  if((slope>=-128) && (slope<=127))
 	   {
          LineSlopeCount[slope+128]++;
-		 //B=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy); 
-		 BSum[slope+128]+=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy); 
+		 //B=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy);
+		 BSum[slope+128]+=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy);
 		 total_counted++;
 	   }
 	 }
@@ -683,7 +687,7 @@ for (uint32_t i=0; i<(n-1); i++)
 if(total_counted>5)
 {
  tc=total_counted;
-//Now find Median value 
+//Now find Median value
 
  n=0;
  total_counted/=2;
@@ -692,7 +696,7 @@ for(int i=0; i<256; i++)
 {
  n+=LineSlopeCount[i];
 
- if(n>=(total_counted)) 
+ if(n>=(total_counted))
   {
 	if(i>1)
 	{
@@ -708,7 +712,7 @@ for(int i=0; i<256; i++)
 			 i++;
 	 }
 	}
-	if(LineSlopeCount[i]!=0) 
+	if(LineSlopeCount[i]!=0)
 	{
      b=BSum[i]/LineSlopeCount[i];
     return i;
