@@ -26,6 +26,7 @@ extern volatile bool bIMU_Id;
 extern volatile bool bCompassCalDirty;
 
 void SetInitalCompass();
+void SetRawHeading(float new_head);
 
 
 

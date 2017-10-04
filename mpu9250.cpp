@@ -940,4 +940,10 @@ nCor++;
 
 
 
+void SetRawHeading(float new_head)
+{
+double a=new_head;
+a*=-(200*32768.0)/250.0;
+RawHeadSum=(int)a;
+}
 

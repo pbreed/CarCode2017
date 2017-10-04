@@ -27,8 +27,7 @@ Speed=null or mph
 
 struct path_element
 {
-float x;
-float y;
+fPoint pt;
 float speed;
 float m_CornerDet_Path_X; 
 float m_CornerDet_Path_Y; 
@@ -53,8 +52,8 @@ bool m_bValid;
 
 path_element()
 {
-x=0;
-y=0;
+pt.x=0;
+pt.y=0;
 speed=0;
 m_CornerDet_Path_X=0;
 m_CornerDet_Path_Y=0;
@@ -79,8 +78,8 @@ m_bValid=false;
 
 void PathInitalValue()
 {
-x=0;
-y=0;
+pt.x=0;
+pt.y=0;
 speed=0;
 m_CornerDet_Path_X=0;
 m_CornerDet_Path_Y=0;
@@ -105,7 +104,12 @@ m_bValid=false;
 
 bool Parse(const char * & cp,int def_next_seq);
 void Show();
+float Dist(const path_element & p) {return pt.Dist(p.pt); };
+float Dist(const fPoint p) {return pt.Dist(p); };
+float HeadToHereDeg(const fPoint &from) {return pt.HeadToHereDeg(from); };
+float HeadToHereDeg(const path_element & p){return pt.HeadToHereDeg(p.pt); }; 
 };
+
 
 
 

@@ -100,7 +100,7 @@ index+=0x10000;//Cos is just sin(x+90)
 return CoreSinLookup(index);
 }
 
-float Q_rsqrt( float number )
+float inv_sqrt( float number )
 {
 	long i;
 	float x2, y;
@@ -109,7 +109,7 @@ float Q_rsqrt( float number )
 	x2 = number * 0.5F;
 	y  = number;
 	i  = * ( long * ) &y;                       // evil floating point bit level hacking
-	i  = 0x5f3759df - ( i >> 1 );               // what the fuck?
+	i  = 0x5f3759df - ( i >> 1 );               // wtf?
 	y  = * ( float * ) &i;
 	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
 	return y;
@@ -120,7 +120,7 @@ void Normalize(float &x, float &y)
   float mag=(x*x)+(y*y);
   if(mag!=0)
   {
-   mag=Q_rsqrt(mag);
+   mag=inv_sqrt(mag);
    x*=mag;
    y*=mag;
   }

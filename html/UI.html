@@ -14,6 +14,21 @@ xhr.onreadystatechange = function () {
 var data2 = document.getElementById('bigbox').value; 
 xhr.send(data2);
 }
+
+
+function Get() {
+xhr = new XMLHttpRequest();
+var url = document.getElementById('urlbox').value;
+xhr.open("GET", url+'.json', true);
+xhr.setRequestHeader("Content-type", "application/json");
+xhr.onreadystatechange = function () { 
+    if (xhr.readyState == 4 && xhr.status == 200) {
+		var tmp=(xhr.responseText);
+		document.getElementById('bigbox').value=tmp;
+    }
+}
+xhr.send();
+}
 //-->
 </script>
 </head>
@@ -21,10 +36,13 @@ xhr.send(data2);
 Jason Basic config code<BR>
 <textarea id="bigbox" cols="80" rows="40" name="comment"></textarea>
 <BR>
-<input id="urlbox" type="text" name="mail" size="25" VALUE="Config">
+<input id="urlbox" type="text" name="mail" size="25" VALUE="path">
 <BR>
 <input type="button" onclick="Post()" value="Post">
+<input type="button" onclick="Get()" value="Get">
+
 <HR>
 </body>
 </html>
+
 

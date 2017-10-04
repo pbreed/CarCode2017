@@ -20,7 +20,7 @@ PLATFORM=NANO54415
 #This will built NAME.s19 and save it as $(NNDK_ROOT)/bin/NAME.s19+
 #This will built NAME_App.s19 and save it as $(NNDK_ROOT)/bin/NAME_App.s19+
 NAME	= AVCCode
-CXXSRCS := main.cpp htmldata.cpp dsm2.cpp lidar.cpp introspec.cpp servodrive.cpp mpu9250.cpp path.cpp pathdata.cpp SinLookUp.cpp
+CXXSRCS := main.cpp htmldata.cpp dsm2.cpp lidar.cpp introspec.cpp servodrive.cpp mpu9250.cpp path.cpp SinLookUp.cpp
 #Uncomment and modify these lines if you have C or S files.
 #CSRCS := foo.c
 #ASRCS := foo.s

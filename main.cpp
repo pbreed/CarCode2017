@@ -30,6 +30,7 @@
 #include "lidar.h"
 #include "dsm2.h"
 #include "mpu9250.h"
+#include "nav.h"
 #include "path.h"
 
 LOGFILEINFO;
@@ -38,11 +39,15 @@ class RunProperties:public config_obj
 {
 public:
 RunProperties():config_obj(appdata,"RunProp") {};
-    config_int CalTime{20,"CalTime"};
-    config_bool  UseMag{true,"UseMag"};
+    config_int    CalTime{20,"CalTime"};
+    config_bool   UseMag{true,"UseMag"};
 	config_double ODODist{4.58,"OdoDist"};
+	config_double CrossAngleScale{1,"XandScale"};
+	config_double CrossMaxCorrect{45,"MaxCorrect"};
 	ConfigEndMarker;
 };
+
+
 
 RunProperties RunProps;
 
@@ -285,13 +290,38 @@ END_INTRO_OBJ;
 
 
 
+START_INTRO_OBJ(NextPointRec,"NextPt")
+int32_element cp{"cp"}; 
+int32_element np{"np"};
+float_element nx{"nx"};
+float_element ny{"ny"};
+float_element ty{"ty"};
+float_element tx{"tx"};
+float_element bh{"bh"};
+float_element sa{"sa"};
+uint32_element stop{"stop"};
+END_INTRO_OBJ;
+
+
+
+
+START_INTRO_OBJ(NavCalcRec,"NavCalc")
+float_element xtk{"xtk"}; 
+float_element hd{"hd"}; 
+float_element x{"x"}; 
+float_element y{"y"}; 
+END_INTRO_OBJ;
+
+
+static NextPointRec NextPointObj;
+static NavCalcRec NavCalcObj;
 static ModeChangeObj mco;
 static SteerLoopObj slo;
 static BootSecObj   bso;
 static CurPosObj    cpo;
 
-static float Pos_x;
-static float Pos_y;
+static fPoint  CurPos;
+
 
 
 const float steer_p =0.01;
@@ -304,7 +334,14 @@ void Steer()
 {
  static float ierr;
 
- float err=(TargetHeading-IntegratedHeading);
+ float head;
+ if(RunProps.UseMag)
+	head=IntegratedHeading;
+	else
+	head=RawHeading;
+
+
+ float err=(TargetHeading-head);
  if(err>180) err-=360;
  if(err<-180) err+=360;
 
@@ -327,8 +364,6 @@ else
 {
  slo.m=0;
 }
-
-
 slo.i=ierr;
 slo.Log();
 }
@@ -343,12 +378,185 @@ void ProcessNewImuData()
 
 }
 
+static int CurPathIndex;
+static fPoint FromPt;
+static fPoint ToPt;
+static float base_head;
+static float next_head;
+static float split_angle;
+static bool bStopHere;
+static float line_dx;
+static float line_dy;
+static float cross_a;
+static float cross_b;
+static float inverse_caroot;
+
+
+
+
+//- is left of cource, + is right of course
+float CalcCrossTrack()
+{
+//We know line dx and line dy
+
+if(line_dx==0) 
+{//Veritcal line.
+
+ if(line_dy>0)
+	 {//headed north  
+	 return (CurPos.x-ToPt.x);
+     }
+	else 
+    {//headed south
+	 return (ToPt.x-CurPos.x); 
+	}
+ }
+//Now the hard cases we are not DXor Dy=0
+float  dist = (cross_a * CurPos.x + cross_b - CurPos.y)*inverse_caroot;
+if(line_dx<0) return -dist;
+return dist;
+}
+
+
+
+float turn_angle(float cur_a, float next_a)
+{
+float a=(next_a-cur_a);
+if(a<-180) a+=360;
+if(a>180) a-=360;
+return a;
+}
+
+float add_angle(float cur_a, float change)
+{
+ float a=cur_a+change;
+ if(a<-180) a+=360;
+ if(a>180) a-=360;
+ return a;
+}
+
+void DoNewNavCalcs();
+
+
+bool TimeToSwitchPoints()
+{
+  float head_to_dest=ToPt.HeadToHereDeg(CurPos);
+  float prop_turn=turn_angle(head_to_dest,split_angle);
+  if((prop_turn>90) || (prop_turn<-90)) return true;
+  return false;
+}
+
+
+void NextPoint()
+{
+	FromPt=PathArray[CurPathIndex].pt;
+	int np=PathArray[CurPathIndex].next_seq;
+	if((np<0) || (PathArray[np].m_bValid==false))
+	{
+	   bStopHere=true;
+
+	   NextPointObj.cp=CurPathIndex;
+	   NextPointObj.np=np;
+	   NextPointObj.nx=ToPt.x;
+	   NextPointObj.ny=ToPt.y;
+	   NextPointObj.tx=FromPt.x;
+	   NextPointObj.ty=FromPt.y;
+	   NextPointObj.bh=base_head;
+	   NextPointObj.sa=split_angle;
+	   NextPointObj.stop=true;
+	   NextPointObj.Log();
+
+
+	   return;
+	}
+	CurPathIndex=np;
+	bStopHere=false;
+	
+	
+	ToPt=PathArray[CurPathIndex].pt; 
+    base_head=ToPt.HeadToHereDeg(FromPt);
+	if((PathArray[CurPathIndex].next_seq<0) || (PathArray[PathArray[CurPathIndex].next_seq].m_bValid==false))
+	{
+	next_head=base_head;
+	}
+	else
+	{
+	 next_head=PathArray[PathArray[CurPathIndex].next_seq].HeadToHereDeg(ToPt);
+	}
+
+	split_angle=add_angle(base_head,turn_angle(base_head,next_head)/2);
+	line_dx=ToPt.x-FromPt.x;
+	line_dy=ToPt.y-FromPt.y;
+	
+	if(line_dx!=0)
+	{
+ 	cross_a = (ToPt.y - FromPt.y) / (ToPt.x - FromPt.x); 
+	cross_b = ToPt.y - cross_a * ToPt.x;                 
+	inverse_caroot= inv_sqrt(cross_a * cross_a + 1);      
+	}
+	NextPointObj.cp=CurPathIndex;
+	NextPointObj.np=PathArray[CurPathIndex].next_seq;
+	NextPointObj.nx=ToPt.x;
+	NextPointObj.ny=ToPt.y;
+	NextPointObj.tx=FromPt.x;
+	NextPointObj.ty=FromPt.y;
+	NextPointObj.bh=base_head;
+	NextPointObj.sa=split_angle;
+	NextPointObj.stop=true;
+	NextPointObj.Log();
+	DoNewNavCalcs();
+
+}
+
+void DoNewNavCalcs()
+{
+  if(TimeToSwitchPoints())
+   {
+	  NextPoint();
+   }
+  float xtk=CalcCrossTrack();
+  
+  float xh=xtk*(float)RunProps.CrossAngleScale;
+  if(xh<-(float)RunProps.CrossMaxCorrect) xh=-(float)RunProps.CrossMaxCorrect; 
+  if(xh> (float)RunProps.CrossMaxCorrect) xh=(float)RunProps.CrossMaxCorrect; 
+  
+  xh+=base_head;
+  if(xh>180) xh-=360;
+  if(xh<-180) xh+=360;
+  TargetHeading=xh;
+
+  NavCalcObj.xtk=xtk;
+  NavCalcObj.hd=TargetHeading;
+  NavCalcObj.x=CurPos.x;
+  NavCalcObj.y=CurPos.y;
+  NavCalcObj.Log();
+}
+
+
+
+
+ 
 
 
 void ModeChange(int new_mode, int prev_mode)
 {
  mco.m=(int16_t)new_mode;
  mco.Log();
+ if(new_mode==1)
+ {
+	 CurPos=PathArray[0].pt;
+     CurPathIndex=0;
+  
+  if(!RunProps.UseMag)
+  {
+   float head=PathArray[1].HeadToHereDeg(PathArray[0]);
+   SetRawHeading(head);
+  }
+  NextPoint();
+
+ }
+
+
 }
 
 
@@ -579,6 +787,7 @@ void UserMain(void * pd)
 	if(LastActiveMode!=nActiveMode)
 		{
 		 ModeChange(nActiveMode,LastActiveMode);
+		 
 		}
 		LastActiveMode =nActiveMode;
     LogRC();
@@ -602,34 +811,46 @@ void UserMain(void * pd)
           usehead-=180.0;
          }
 
-		 bLidarLeft=false;
 		 float dx=dist*LookUpSinDeg(usehead);
 		 float dy=dist*LookUpCosDeg(usehead);
 		 last_head=head;
-		 Pos_x+=dx;
-     	 Pos_y+=dy;
-		 cpo.x=Pos_x;
-		 cpo.y=Pos_y;
+		 CurPos.x+=dx;
+     	 CurPos.y+=dy;
+		 cpo.x=CurPos.x;
+		 cpo.y=CurPos.y;
 		 uint32_t t1=sim2.timer[3].tcn;
 		 uint32_t tc=0;
 		 int32_t b;
-		 cpo.pc=LidarPointCount;
+		 bLidarRight=false;
+         cpo.pc=LidarPointCount;
 		 cpo.sn=ProcessLidarLines(b,tc);
 		 cpo.tc=tc;
 		 cpo.b=b;
 		 uint32_t t2=sim2.timer[3].tcn;
 		 LidarPointCount=0;
 		 cpo.dt=(t2-t1);
-		 bLidarLeft=true;
+		 bLidarRight=true;
 
-		 cpo.Log();
+		 if(nActiveMode==1) DoNewNavCalcs();
+
+        cpo.Log();
    }
 
    if(newServoFrame())
    {
-	   if(nActiveMode==0)
-		   SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
-		   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+	   if(nActiveMode==0) 
+		   {
+		    SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
+			SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+	       }
+	   else
+		   if(nActiveMode==1) 
+		 {
+		 Steer();
+		 if(bStopHere) SetServoPos(MOTOR_SERVO,0);
+			 else
+			 SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+		}
 
 
    }

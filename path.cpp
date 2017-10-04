@@ -6,25 +6,33 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <system.h>
+#include "nav.h"
 #include "path.h"
 
-char * pPostPath;
-int postDataLen;
+
+extern "C"
+{void GetPathJson(int sock, const char * url);
+}
 							
+void ParseAndPopulatePath(const char * cp);
+
+
+void GetPathJson(int sock, const char * url)
+{
+const char * cp=(const char *) GetUserParameters();
+if(cp[0]=='{') writestring(sock,cp);
+}
+
 void ProcessPathPost( int sock, char *url, char *pData, char *rxBuffer)
 {
 SendHTMLHeader( sock );
 writestring( sock, "<HTML><BODY>Got Post </BODY></HTML>" );
 while((*pData) && (*pData!='{')) pData++;
 int len=strlen(pData);
-if(pPostPath) free(pPostPath);
-pPostPath=(char *)malloc(len+1);
-
-memcpy(pPostPath,pData,len);
-pPostPath[len+1]=0;
-postDataLen=len;
-
+if(len < 8191) SaveUserParameters(pData,len+1);
 iprintf("Got post of %d bytes\r\n",len);
+ParseAndPopulatePath(pData);
 }
 
 
@@ -32,9 +40,17 @@ iprintf("Got post of %d bytes\r\n",len);
 int MyDoPost( int sock, char *url, char *pData, char *rxBuffer )
 {
    iprintf( "Processing post for %s\r\n", url );
-   if ( httpstricmp( url, "PATHPOST" ) == 0 )
+   if(url[0]=='/') url++;
+   if(url[0]=='\\') url++;
+   if ( httpstricmp( url,"PATH" ))
    {
+	   iprintf("Processing post[%s]\r\n",url);
+
 	  ProcessPathPost(sock,url,pData,rxBuffer );
+   }
+   else
+   {
+	iprintf("Failed to do post [%s]\r\n",url);
    }
 
    return 0;
@@ -54,14 +70,8 @@ extern const unsigned char PathData[];
 path_element PathArray[1000];
 
 
-class Point
-{ public:
-	 float x;
-     float y;
- Point(float xi=0, float yi=0) {x=xi; y=yi; };
-};
 
-float Calc_Distance(Point p1, Point p2)
+float Calc_Distance(const fPoint &p1,const  fPoint &p2)
 {
 float s=((p1.x-p2.x)*(p1.x-p2.x))+((p1.y-p2.y)*(p1.y-p2.y));
 return sqrtf(s);
@@ -71,7 +81,7 @@ return sqrtf(s);
 
 //Assumes X is west /east
 //Assumes y is norht south
-float Calc_HeadDeg(Point pfrom, Point pto)
+float Calc_HeadDeg(const fPoint &pfrom,const  fPoint &pto)                                                                                                                                                                                     
 {
 float dx=(pto.x-pfrom.x);
 float dy=(pto.y-pfrom.y);
@@ -93,6 +103,12 @@ float d=atan2(dy,dx);
 return (float)d*180.0/PI;
 }
 
+float fPoint::Dist(const fPoint &p1) {return Calc_Distance(*this,p1); };
+float fPoint::HeadToHereDeg(const fPoint &from) {return Calc_HeadDeg(from,*this);};
+
+
+
+
 
 
 void ParseAndPopulatePath(const char * cp)
@@ -110,10 +126,10 @@ if (*cp)
 	
 		if((PathArray[n].m_bDoEdge) && (n>0))
 		{
-		 Point pnext(PathArray[n].x,PathArray[n].y);
-		 Point pprev(PathArray[n-1].x,PathArray[n-1].y);
-		 Point wall(PathArray[n].m_edge_x,PathArray[n].m_edge_y);
-		 Point pcenter((pnext.x+pprev.x)/2,(pnext.y+pprev.y)/2);
+		 fPoint pnext=PathArray[n].pt;
+		 fPoint pprev=PathArray[n-1].pt;
+		 fPoint wall(PathArray[n].m_edge_x,PathArray[n].m_edge_y);
+		 fPoint pcenter((pnext.x+pprev.x)/2,(pnext.y+pprev.y)/2);
 		 float dist=Calc_Distance(pcenter,wall);
 		 float head=Calc_HeadDeg(pprev,pnext);
 		 float whead=Calc_HeadDeg(pcenter,wall);
@@ -128,10 +144,10 @@ if (*cp)
 		
 		if((PathArray[n].m_bDoCorner)&& (n>0))
 		{
-		 Point pnext(PathArray[n].x,PathArray[n].y);
-		 Point pprev(PathArray[n-1].x,PathArray[n-1].y);
-		 Point corner(PathArray[n].m_CornerAct_X,PathArray[n].m_CornerAct_Y);
-		 Point onpath(PathArray[n].m_CornerDet_Path_X,PathArray[n].m_CornerDet_Path_Y);
+		 fPoint pnext=PathArray[n].pt;
+         fPoint pprev=PathArray[n-1].pt;
+		 fPoint corner(PathArray[n].m_CornerAct_X,PathArray[n].m_CornerAct_Y);
+		 fPoint onpath(PathArray[n].m_CornerDet_Path_X,PathArray[n].m_CornerDet_Path_Y);
 		 float dist=Calc_Distance(onpath,corner);
 		 float head=Calc_HeadDeg(pprev,pnext);
 		 float chead=Calc_HeadDeg(onpath,corner);
@@ -165,15 +181,8 @@ if (*cp)
 
 void PopulatePath()
 {
-const char * cp;
-if(pPostPath)
-	{cp=pPostPath;
-    }
-else
-{ cp=(const char *)PathData;
-}
-
-ParseAndPopulatePath(cp);
+const char * cp=(const char *) GetUserParameters();
+if(cp[0]=='{') ParseAndPopulatePath(cp);
 }
 
 
@@ -342,7 +351,7 @@ void ReadXY(const char* &cp, float & x, float & y)
 
 void path_element::Show()
 {
-printf("[x:%4.2f, y:%4.2f] Edge %d Corner %d \r\n",x,y,m_bDoEdge,m_bDoCorner);
+printf("[x:%4.2f, y:%4.2f] Edge %d Corner %d \r\n",pt.x,pt.y,m_bDoEdge,m_bDoCorner);
 }
 
 
@@ -365,7 +374,7 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
  {
  if(strid(cp,"pt"))
   {
-   ReadXY(cp,x,y);
+   ReadXY(cp,pt.x,pt.y);
   }
 
  if(strid(cp,"Edgev"))
