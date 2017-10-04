@@ -1,16 +1,21 @@
+#include <basictypes.h>
 #include <math.h>
 #include <stdio.h>
+#include "introspec.h"
+LOGFILEINFO;
+
 
 const float pi=3.14159265358979323846;
 
-float SinQuadTable[65535];
+float SinQuadTable[65536];
 float AX128ToSinCosInIn[46080][2];
 
 
 void SetUpTables()
 {
 iprintf("Starting to setup tables\n");
- for(int i=0; i<65536;i++)
+ 
+for(int i=0; i<65536; i++)
  {
     double d=i;
     d*=pi;

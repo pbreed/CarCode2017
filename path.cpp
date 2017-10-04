@@ -7,8 +7,11 @@
 #include <ctype.h>
 #include <math.h>
 #include <system.h>
+#include "SinLookup.h"
 #include "nav.h"
 #include "path.h"
+#include "introspec.h"
+LOGFILEINFO;
 
 
 extern "C"
@@ -99,8 +102,19 @@ if(dy==0)
    else return -90.0;
 }
 
-float d=atan2(dy,dx);
-return (float)d*180.0/PI;
+// So realize that atan 2 works on unit circle where 0 deg is east 
+// and 90 is north
+// and 180 is west
+// and 270/-90 is south
+
+float d=Fast_atan2(dx,dy);
+//So we need to reverse direction....
+d*=(180.0/PI);
+//and rotate 90
+//d-=90;
+if(d<-180) d+=360.0;
+if(d> 180) d-=360.0;
+return d;
 }
 
 float fPoint::Dist(const fPoint &p1) {return Calc_Distance(*this,p1); };
@@ -110,9 +124,13 @@ float fPoint::HeadToHereDeg(const fPoint &from) {return Calc_HeadDeg(from,*this)
 
 
 
+static float xoffset;
+static float yoffset;
+static bool bOffset_Set;
 
 void ParseAndPopulatePath(const char * cp)
 {
+
 
 cp=strstr(cp,"Path");
 if(cp)
@@ -121,10 +139,12 @@ while ((*cp!='[') && (*cp)) cp++;
 if (*cp)
  { cp++; //Go past [
 	int n=0;
+	xoffset=0;
+	yoffset=0;
+	bOffset_Set=false;
 	while((*cp) && (*cp!=']') && (PathArray[n].Parse(cp,n+1)))
 		{
-	
-		if((PathArray[n].m_bDoEdge) && (n>0))
+        if((PathArray[n].m_bDoEdge) && (n>0))
 		{
 		 fPoint pnext=PathArray[n].pt;
 		 fPoint pprev=PathArray[n-1].pt;
@@ -334,6 +354,14 @@ bool nextnull(const char* &cp)
  return false;
 }
 
+START_INTRO_OBJ(PathOrigin,"PathOrigin")
+float_element x{"x"};
+float_element y{"y"};
+END_INTRO_OBJ;
+
+static PathOrigin porg;
+
+
 void ReadXY(const char* &cp, float & x, float & y)
 {
 	trimlead(cp);
@@ -343,8 +371,20 @@ void ReadXY(const char* &cp, float & x, float & y)
 	 {
 
 		 if(strid(cp,"x")){x=ReadFNumber(cp);}
-		 if(strid(cp,"y")){y=ReadFNumber(cp);}
+		 if(strid(cp,"y")){y=-ReadFNumber(cp);}  /*Y Signs are reversed! */
 	 }
+     if(!bOffset_Set)
+	 {
+      xoffset=x;
+      yoffset=y;   
+	  bOffset_Set=true;
+	  porg.x=xoffset;
+	  porg.y=yoffset;
+	  porg.Log(true);
+	 }
+     x-=xoffset;
+	 y-=yoffset;
+
    if(*cp=='}') cp++;
 }
 

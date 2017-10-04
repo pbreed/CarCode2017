@@ -310,6 +310,8 @@ float_element xtk{"xtk"};
 float_element hd{"hd"}; 
 float_element x{"x"}; 
 float_element y{"y"}; 
+float_element htd{"htd"}; 
+float_element propt{"propt"}; 
 END_INTRO_OBJ;
 
 
@@ -435,16 +437,23 @@ float add_angle(float cur_a, float change)
  return a;
 }
 
+
+float avg_angle(float a1, float a2)
+{
+float v;
+	v=(a1+a2)/2;
+	if(fabs(a1-a2) > 180.0)
+	{
+	  v=v-180;
+	}
+ if(v>180.0) v-=360.;
+ if(v<-180) v+=360.0;
+ return v;
+}
+
 void DoNewNavCalcs();
 
 
-bool TimeToSwitchPoints()
-{
-  float head_to_dest=ToPt.HeadToHereDeg(CurPos);
-  float prop_turn=turn_angle(head_to_dest,split_angle);
-  if((prop_turn>90) || (prop_turn<-90)) return true;
-  return false;
-}
 
 
 void NextPoint()
@@ -462,7 +471,7 @@ void NextPoint()
 	   NextPointObj.tx=FromPt.x;
 	   NextPointObj.ty=FromPt.y;
 	   NextPointObj.bh=base_head;
-	   NextPointObj.sa=split_angle;
+	   NextPointObj.sa=base_head;
 	   NextPointObj.stop=true;
 	   NextPointObj.Log();
 
@@ -484,7 +493,7 @@ void NextPoint()
 	 next_head=PathArray[PathArray[CurPathIndex].next_seq].HeadToHereDeg(ToPt);
 	}
 
-	split_angle=add_angle(base_head,turn_angle(base_head,next_head)/2);
+	split_angle=avg_angle(base_head,next_head);
 	line_dx=ToPt.x-FromPt.x;
 	line_dy=ToPt.y-FromPt.y;
 	
@@ -510,13 +519,24 @@ void NextPoint()
 
 void DoNewNavCalcs()
 {
-  if(TimeToSwitchPoints())
-   {
-	  NextPoint();
-   }
+
+
+    float head_to_dest=ToPt.HeadToHereDeg(CurPos);
+    float prop_turn=turn_angle(head_to_dest,split_angle);
+
+	//head_to_Dest is direction directly to the current wp
+	//split angle is the bisector fo the two current headings 
+	//So prop turn is how many degree change from head to and split if the turn is mroe than 90
+	//we shoudl go to next wp
+    if((prop_turn>90) || (prop_turn<-90)) 
+		{
+		NextPoint();
+		}
+
+
   float xtk=CalcCrossTrack();
   
-  float xh=xtk*(float)RunProps.CrossAngleScale;
+  float xh=-xtk*(float)RunProps.CrossAngleScale;
   if(xh<-(float)RunProps.CrossMaxCorrect) xh=-(float)RunProps.CrossMaxCorrect; 
   if(xh> (float)RunProps.CrossMaxCorrect) xh=(float)RunProps.CrossMaxCorrect; 
   
@@ -529,6 +549,8 @@ void DoNewNavCalcs()
   NavCalcObj.hd=TargetHeading;
   NavCalcObj.x=CurPos.x;
   NavCalcObj.y=CurPos.y;
+  NavCalcObj.htd=head_to_dest;
+  NavCalcObj.propt=prop_turn;
   NavCalcObj.Log();
 }
 
@@ -661,6 +683,46 @@ return false;
 uint32_t ProcessLidarLines(int32_t &b,uint32_t &tc);
 
 
+/*
+void TestSet(fPoint p1, fPoint p2)
+{
+ float h=p2.HeadToHereDeg(p1);
+ float d=p2.Dist(p1);
+ printf("[%g,%g] to [%g,%g] H:%g D=%g\r\n",p1.x,p1.y,p2.x,p2.y,h,d);
+}
+
+void Testnav()
+{
+fPoint p1(0,0);
+fPoint p2(0,10);
+TestSet(p1,p2);
+p2.x=10;
+p2.y=10;
+TestSet(p1,p2);
+p2.y=0;
+TestSet(p1,p2);
+p2.y=-10;
+TestSet(p1,p2);
+p2.x=0;
+TestSet(p1,p2);
+p2.x=-10;
+TestSet(p1,p2);
+p2.y=0;
+TestSet(p1,p2);
+p2.y=10;
+TestSet(p1,p2);
+p2.x=8.6;
+p2.y=5;
+TestSet(p1,p2);
+p2.y=-5;
+TestSet(p1,p2);
+p2.x=-8.6;
+TestSet(p1,p2);
+p2.y=5;
+TestSet(p1,p2);
+
+}
+  */
 void UserMain(void * pd)
 {
 	initWithWeb();
@@ -675,6 +737,8 @@ void UserMain(void * pd)
     uint32_t ttn=TimeTick;
     SetUpTables();
     iprintf("Table init Took %ld ticks\r\n",TimeTick-ttn);
+
+	//Testnav();
 
 
    Pins[27].function(PIN_27_I2C0_SCL    );//I2C for IMU
@@ -805,12 +869,8 @@ void UserMain(void * pd)
 		 float dist=(float)RunProps.ODODist;
 
          //Can't average headings...s
-         float usehead=(head+last_head)/2;
-         if(fabs(head-last_head) > 180.0)
-         {
-          usehead-=180.0;
-         }
-
+		 float usehead=avg_angle(head,last_head);
+		 
 		 float dx=dist*LookUpSinDeg(usehead);
 		 float dy=dist*LookUpCosDeg(usehead);
 		 last_head=head;
