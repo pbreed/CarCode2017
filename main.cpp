@@ -32,6 +32,7 @@
 #include "mpu9250.h"
 #include "nav.h"
 #include "path.h"
+#include "SimpleAD.h"
 
 LOGFILEINFO;
 
@@ -291,7 +292,7 @@ END_INTRO_OBJ;
 
 
 START_INTRO_OBJ(NextPointRec,"NextPt")
-int32_element cp{"cp"}; 
+int32_element cp{"cp"};
 int32_element np{"np"};
 float_element nx{"nx"};
 float_element ny{"ny"};
@@ -306,12 +307,12 @@ END_INTRO_OBJ;
 
 
 START_INTRO_OBJ(NavCalcRec,"NavCalc")
-float_element xtk{"xtk"}; 
-float_element hd{"hd"}; 
-float_element x{"x"}; 
-float_element y{"y"}; 
-float_element htd{"htd"}; 
-float_element propt{"propt"}; 
+float_element xtk{"xtk"};
+float_element hd{"hd"};
+float_element x{"x"};
+float_element y{"y"};
+float_element htd{"htd"};
+float_element propt{"propt"};
 END_INTRO_OBJ;
 
 
@@ -401,16 +402,16 @@ float CalcCrossTrack()
 {
 //We know line dx and line dy
 
-if(line_dx==0) 
+if(line_dx==0)
 {//Veritcal line.
 
  if(line_dy>0)
-	 {//headed north  
+	 {//headed north
 	 return (CurPos.x-ToPt.x);
      }
-	else 
+	else
     {//headed south
-	 return (ToPt.x-CurPos.x); 
+	 return (ToPt.x-CurPos.x);
 	}
  }
 //Now the hard cases we are not DXor Dy=0
@@ -482,7 +483,7 @@ void NextPoint()
 	bStopHere=false;
 	
 	
-	ToPt=PathArray[CurPathIndex].pt; 
+	ToPt=PathArray[CurPathIndex].pt;
     base_head=ToPt.HeadToHereDeg(FromPt);
 	if((PathArray[CurPathIndex].next_seq<0) || (PathArray[PathArray[CurPathIndex].next_seq].m_bValid==false))
 	{
@@ -499,9 +500,9 @@ void NextPoint()
 	
 	if(line_dx!=0)
 	{
- 	cross_a = (ToPt.y - FromPt.y) / (ToPt.x - FromPt.x); 
-	cross_b = ToPt.y - cross_a * ToPt.x;                 
-	inverse_caroot= inv_sqrt(cross_a * cross_a + 1);      
+ 	cross_a = (ToPt.y - FromPt.y) / (ToPt.x - FromPt.x);
+	cross_b = ToPt.y - cross_a * ToPt.x;
+	inverse_caroot= inv_sqrt(cross_a * cross_a + 1);
 	}
 	NextPointObj.cp=CurPathIndex;
 	NextPointObj.np=PathArray[CurPathIndex].next_seq;
@@ -525,21 +526,21 @@ void DoNewNavCalcs()
     float prop_turn=turn_angle(head_to_dest,split_angle);
 
 	//head_to_Dest is direction directly to the current wp
-	//split angle is the bisector fo the two current headings 
+	//split angle is the bisector fo the two current headings
 	//So prop turn is how many degree change from head to and split if the turn is mroe than 90
 	//we shoudl go to next wp
-    if((prop_turn>90) || (prop_turn<-90)) 
+    if((prop_turn>90) || (prop_turn<-90))
 		{
 		NextPoint();
 		}
 
 
   float xtk=CalcCrossTrack();
-  
+
   float xh=-xtk*(float)RunProps.CrossAngleScale;
-  if(xh<-(float)RunProps.CrossMaxCorrect) xh=-(float)RunProps.CrossMaxCorrect; 
-  if(xh> (float)RunProps.CrossMaxCorrect) xh=(float)RunProps.CrossMaxCorrect; 
-  
+  if(xh<-(float)RunProps.CrossMaxCorrect) xh=-(float)RunProps.CrossMaxCorrect;
+  if(xh> (float)RunProps.CrossMaxCorrect) xh=(float)RunProps.CrossMaxCorrect;
+
   xh+=base_head;
   if(xh>180) xh-=360;
   if(xh<-180) xh+=360;
@@ -557,7 +558,7 @@ void DoNewNavCalcs()
 
 
 
- 
+
 
 
 void ModeChange(int new_mode, int prev_mode)
@@ -568,7 +569,7 @@ void ModeChange(int new_mode, int prev_mode)
  {
 	 CurPos=PathArray[0].pt;
      CurPathIndex=0;
-  
+
   if(!RunProps.UseMag)
   {
    float head=PathArray[1].HeadToHereDeg(PathArray[0]);
@@ -624,6 +625,11 @@ void LCD_DisplayTask(void * pd)
 
 	  LCD_X_Y(LCD_SER,0,1);
 	  fdprintf(LCD_SER,"L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
+
+	  printf("L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
+      printf("OdoCount %ld LIDAR_VALUE=%ld\r\n",OdoCount,LIDAR_VALUE);
+      printf("AD [%04X,%04X,%04X,%04X]\r\n",GetADResult(0),GetADResult(1),GetADResult(2),GetADResult(3));
+      StartAD();
 
 	  Lsec=Secs;
 	  LastLidar=LidarScanCount;
@@ -754,7 +760,6 @@ void UserMain(void * pd)
    Pins[14].function(PIN_14_UART6_RXD);	//RC RX
    Pins[38].function(PIN_38_UART5_TXD); //TX to Serial LCD
 
-
    iprintf("*************************pop path **********************\r\n");
    PopulatePath();
    iprintf("*************************end path **********************\r\n");
@@ -765,9 +770,9 @@ void UserMain(void * pd)
    LCD_CLS(LCD_SER);
 
 
-
-
    SetPinIrq(49,-1,OdoIrq);
+
+
 
 
    iprintf("Application started\n");
@@ -785,9 +790,10 @@ void UserMain(void * pd)
    InitDSM2Rx(6);
    RCCallBack=ProcessNewRCPos;
 
+    InitSingleEndAD();
 
-   ImuMode=eCalibrating;
-   OSTimeDly(TICKS_PER_SECOND);
+    ImuMode=eCalibrating;
+    OSTimeDly(TICKS_PER_SECOND);
    uint32_t Lsec=Secs;
 
    while(Lsec==Secs) asm(" nop");
@@ -851,7 +857,7 @@ void UserMain(void * pd)
 	if(LastActiveMode!=nActiveMode)
 		{
 		 ModeChange(nActiveMode,LastActiveMode);
-		 
+		
 		}
 		LastActiveMode =nActiveMode;
     LogRC();
@@ -870,7 +876,7 @@ void UserMain(void * pd)
 
          //Can't average headings...s
 		 float usehead=avg_angle(head,last_head);
-		 
+		
 		 float dx=dist*LookUpSinDeg(usehead);
 		 float dy=dist*LookUpCosDeg(usehead);
 		 last_head=head;
@@ -883,7 +889,7 @@ void UserMain(void * pd)
 		 int32_t b;
 		 bLidarRight=false;
          cpo.pc=LidarPointCount;
-		 cpo.sn=ProcessLidarLines(b,tc);
+		 cpo.sn=1; //ProcessLidarLines(b,tc);
 		 cpo.tc=tc;
 		 cpo.b=b;
 		 uint32_t t2=sim2.timer[3].tcn;
@@ -898,13 +904,13 @@ void UserMain(void * pd)
 
    if(newServoFrame())
    {
-	   if(nActiveMode==0) 
+	   if(nActiveMode==0)
 		   {
 		    SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
 			SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
 	       }
 	   else
-		   if(nActiveMode==1) 
+		   if(nActiveMode==1)
 		 {
 		 Steer();
 		 if(bStopHere) SetServoPos(MOTOR_SERVO,0);
