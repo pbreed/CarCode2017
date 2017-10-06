@@ -123,7 +123,7 @@ inline void LIDAR_ProcessChar(uint8_t c)
 				   {
 					   int x=(int)(AX128ToSinCosInIn[a][0]*(float)d);
 					   int y=(int)(AX128ToSinCosInIn[a][1]*(float)d);
-					   uint32_t n=(LidarPointCount& 0xFF);
+					   uint32_t n=(LidarPointCount % MAX_LIDAR_POINTS);
 					   LidarPointCount++;
 					   LidarPointSet[n].x=x;
 					   LidarPointSet[n].y=y;

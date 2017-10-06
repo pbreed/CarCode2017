@@ -42,9 +42,12 @@ public:
 RunProperties():config_obj(appdata,"RunProp") {};
     config_int    CalTime{20,"CalTime"};
     config_bool   UseMag{true,"UseMag"};
-	config_double ODODist{4.58,"OdoDist"};
+	config_bool    StopOnRcLoss{true,"saferc"};
+	config_double SteerZero{0.00,"SteerZero"};
+    config_double ODODist{4.58,"OdoDist"};
 	config_double CrossAngleScale{1,"XandScale"};
 	config_double CrossMaxCorrect{45,"MaxCorrect"};
+
 	ConfigEndMarker;
 };
 
@@ -356,7 +359,7 @@ void Steer()
  slo.t=TargetHeading;
  slo.e=err;
 
- SetServoPos(0,-sv);
+ SetServoPos(0,-sv+(float)RunProps.SteerZero);
 
 if(bIsMoving())
 {
@@ -587,6 +590,8 @@ void ModeChange(int new_mode, int prev_mode)
 extern volatile uint32_t LidarRxc;
 extern void RegisterPost();
 
+volatile bool bRCFrameError;
+
 int LCD_SER;
 
 void LCD_DisplayTask(void * pd)
@@ -626,9 +631,14 @@ void LCD_DisplayTask(void * pd)
 	  LCD_X_Y(LCD_SER,0,1);
 	  fdprintf(LCD_SER,"L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
 
-	  printf("L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
-      printf("OdoCount %ld LIDAR_VALUE=%ld\r\n",OdoCount,LIDAR_VALUE);
-      printf("AD [%04X,%04X,%04X,%04X]\r\n",GetADResult(0),GetADResult(1),GetADResult(2),GetADResult(3));
+	  if(RCFrameCnt-LastRCFrame<10) 
+		  bRCFrameError=true;
+	  else
+		  bRCFrameError=false;
+//
+//	  printf("L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
+//      printf("OdoCount %ld LIDAR_VALUE=%ld\r\n",OdoCount,LIDAR_VALUE);
+//      printf("AD [%04X,%04X,%04X,%04X]\r\n",GetADResult(0),GetADResult(1),GetADResult(2),GetADResult(3));
       StartAD();
 
 	  Lsec=Secs;
@@ -886,10 +896,10 @@ void UserMain(void * pd)
 		 cpo.y=CurPos.y;
 		 uint32_t t1=sim2.timer[3].tcn;
 		 uint32_t tc=0;
-		 int32_t b;
+		 int32_t b=0;
 		 bLidarRight=false;
          cpo.pc=LidarPointCount;
-		 cpo.sn=1; //ProcessLidarLines(b,tc);
+		 cpo.sn=ProcessLidarLines(b,tc);
 		 cpo.tc=tc;
 		 cpo.b=b;
 		 uint32_t t2=sim2.timer[3].tcn;
@@ -907,16 +917,20 @@ void UserMain(void * pd)
 	   if(nActiveMode==0)
 		   {
 		    SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
-			SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+            SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
 	       }
 	   else
 		   if(nActiveMode==1)
 		 {
 		 Steer();
 		 if(bStopHere) SetServoPos(MOTOR_SERVO,0);
-			 else
-			 SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+		  else
+		 SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
 		}
+		   if(bRCFrameError && RunProps.StopOnRcLoss)
+		   {
+			   SetServoPos(MOTOR_SERVO,0); 
+		   }
 
 
    }

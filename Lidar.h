@@ -13,7 +13,7 @@ int x;
 int y;
 };
 
-#define MAX_LIDAR_POINTS (256)
+#define MAX_LIDAR_POINTS (48)
 
 extern volatile IntPoint LidarPointSet[MAX_LIDAR_POINTS];
 extern volatile uint32_t LidarPointCount;
