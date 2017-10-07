@@ -47,7 +47,9 @@ RunProperties():config_obj(appdata,"RunProp") {};
     config_double ODODist{4.58,"OdoDist"};
 	config_double CrossAngleScale{1,"XandScale"};
 	config_double CrossMaxCorrect{45,"MaxCorrect"};
-
+	config_double SteerP{0.02,"SteerP"};
+	config_double SteerD{0,"SteerD"};
+	config_double SteerI{0,"SteerI"};
 	ConfigEndMarker;
 };
 
@@ -329,11 +331,8 @@ static CurPosObj    cpo;
 static fPoint  CurPos;
 
 
-
-const float steer_p =0.01;
-const float steer_i =0.0; //001;
-const float max_steer =0.6;
-const float min_steer =-0.6;
+const float max_steer =0.75;
+const float min_steer =-0.75;
 
 
 void Steer()
@@ -351,7 +350,7 @@ void Steer()
  if(err>180) err-=360;
  if(err<-180) err+=360;
 
- float sv=steer_p*err + steer_i*ierr;
+ float sv=(float)RunProps.SteerP*err+ (float)RunProps.SteerI*ierr+(float)RunProps.SteerD*(float)RotVel[2]/1000.0;
 
  if(sv>max_steer) sv=max_steer;
  if(sv<min_steer) sv=min_steer;
@@ -568,7 +567,7 @@ void ModeChange(int new_mode, int prev_mode)
 {
  mco.m=(int16_t)new_mode;
  mco.Log();
- if(new_mode==1)
+ if((prev_mode==0) && (new_mode!=0))
  {
 	 CurPos=PathArray[0].pt;
      CurPathIndex=0;
@@ -899,7 +898,7 @@ void UserMain(void * pd)
 		 int32_t b=0;
 		 bLidarRight=false;
          cpo.pc=LidarPointCount;
-		 cpo.sn=ProcessLidarLines(b,tc);
+		 //cpo.sn=ProcessLidarLines(b,tc);
 		 cpo.tc=tc;
 		 cpo.b=b;
 		 uint32_t t2=sim2.timer[3].tcn;
@@ -907,7 +906,10 @@ void UserMain(void * pd)
 		 cpo.dt=(t2-t1);
 		 bLidarRight=true;
 
-		 if(nActiveMode==1) DoNewNavCalcs();
+		 if(nActiveMode!=0)
+			 { 
+			  DoNewNavCalcs();
+			 };
 
         cpo.Log();
    }
@@ -920,12 +922,14 @@ void UserMain(void * pd)
             SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
 	       }
 	   else
-		   if(nActiveMode==1)
 		 {
 		 Steer();
-		 if(bStopHere) SetServoPos(MOTOR_SERVO,0);
+		 if(bStopHere) SetServoPos(MOTOR_SERVO,-0.5);
 		  else
-		 SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+		 if(nActiveMode==1)
+		   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+		 else
+		   SetServoPos(MOTOR_SERVO,0.2);
 		}
 		   if(bRCFrameError && RunProps.StopOnRcLoss)
 		   {
