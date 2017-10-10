@@ -189,7 +189,7 @@ void SetServoRaw(int ch, int v)
 
     int vc=v;
     vc-=1024;
-    vc*=40;
+    vc*=60;
     vc+=SERVO_ZERO;
 
 

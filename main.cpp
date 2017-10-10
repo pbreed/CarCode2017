@@ -50,6 +50,8 @@ RunProperties():config_obj(appdata,"RunProp") {};
 	config_double SteerP{0.02,"SteerP"};
 	config_double SteerD{0,"SteerD"};
 	config_double SteerI{0,"SteerI"};
+	config_double Thro{0.1,"Thro"};
+	config_double Brake{0.50,"Brake"};
 	ConfigEndMarker;
 };
 
@@ -79,6 +81,8 @@ extern int32_t ZeroCount;
 volatile uint32_t OdoCount;
 volatile uint32_t DtOdoCount;
 volatile uint32_t LastOdoTime;
+
+
 
 void OdoIrq(void)
 {
@@ -305,6 +309,7 @@ float_element ty{"ty"};
 float_element tx{"tx"};
 float_element bh{"bh"};
 float_element sa{"sa"};
+float_element speed{"speed"};
 uint32_element stop{"stop"};
 END_INTRO_OBJ;
 
@@ -334,7 +339,7 @@ static fPoint  CurPos;
 const float max_steer =0.75;
 const float min_steer =-0.75;
 
-
+   //zot
 void Steer()
 {
  static float ierr;
@@ -387,6 +392,7 @@ static int CurPathIndex;
 static fPoint FromPt;
 static fPoint ToPt;
 static float base_head;
+static float SegSpeed;
 static float next_head;
 static float split_angle;
 static bool bStopHere;
@@ -467,6 +473,7 @@ void NextPoint()
 	{
 	   bStopHere=true;
 
+	   SegSpeed=PathArray[CurPathIndex].speed; 
 	   NextPointObj.cp=CurPathIndex;
 	   NextPointObj.np=np;
 	   NextPointObj.nx=ToPt.x;
@@ -476,6 +483,7 @@ void NextPoint()
 	   NextPointObj.bh=base_head;
 	   NextPointObj.sa=base_head;
 	   NextPointObj.stop=true;
+	   NextPointObj.speed=PathArray[CurPathIndex].speed; ;
 	   NextPointObj.Log();
 
 
@@ -484,6 +492,7 @@ void NextPoint()
 	CurPathIndex=np;
 	bStopHere=false;
 	
+	SegSpeed=PathArray[CurPathIndex].speed;
 	
 	ToPt=PathArray[CurPathIndex].pt;
     base_head=ToPt.HeadToHereDeg(FromPt);
@@ -514,7 +523,8 @@ void NextPoint()
 	NextPointObj.ty=FromPt.y;
 	NextPointObj.bh=base_head;
 	NextPointObj.sa=split_angle;
-	NextPointObj.stop=true;
+	NextPointObj.stop=bStopHere;
+	NextPointObj.speed=SegSpeed;
 	NextPointObj.Log();
 	DoNewNavCalcs();
 
@@ -536,13 +546,22 @@ void DoNewNavCalcs()
 		NextPoint();
 		}
 
+//	zot      
+ float head;
+ if(RunProps.UseMag)
+	head=IntegratedHeading;
+	else
+	head=RawHeading;
 
+ 
   float xtk=CalcCrossTrack();
-
-  float xh=-xtk*(float)RunProps.CrossAngleScale;
+ float xh=0;
+ //If we are not withing 45 deg of heading Xtrak doe snot matter...
+ if(fabs(turn_angle(head,base_head))<45)
+ { xh=-xtk*(float)RunProps.CrossAngleScale;
   if(xh<-(float)RunProps.CrossMaxCorrect) xh=-(float)RunProps.CrossMaxCorrect;
   if(xh> (float)RunProps.CrossMaxCorrect) xh=(float)RunProps.CrossMaxCorrect;
-
+ }
   xh+=base_head;
   if(xh>180) xh-=360;
   if(xh<-180) xh+=360;
@@ -924,12 +943,15 @@ void UserMain(void * pd)
 	   else
 		 {
 		 Steer();
-		 if(bStopHere) SetServoPos(MOTOR_SERVO,-0.5);
+		 if(bStopHere) SetServoPos(MOTOR_SERVO,-(fabs((float)RunProps.Brake)));
 		  else
 		 if(nActiveMode==1)
 		   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
 		 else
-		   SetServoPos(MOTOR_SERVO,0.2);
+		   if(SegSpeed>-1)
+		   SetServoPos(MOTOR_SERVO,SegSpeed);
+			   else
+		   SetServoPos(MOTOR_SERVO,RunProps.Thro);
 		}
 		   if(bRCFrameError && RunProps.StopOnRcLoss)
 		   {
