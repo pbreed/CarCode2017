@@ -218,6 +218,15 @@ if(RCFrameCnt!=LastCount)
   }
 }
 
+START_INTRO_OBJ(RCDriveObj,"RCDrive")
+uint16_element steer{"steer"};
+uint16_element motor{"motor"};
+END_INTRO_OBJ;
+
+RCDriveObj SFObj;
+
+
+
 START_INTRO_OBJ(RCStateObj,"RCCh")
 uint16_element c0{"c0"};
 uint16_element c1{"c1"};
@@ -676,32 +685,36 @@ void LCD_DisplayTask(void * pd)
 bool newRC()
 {
 static uint32_t LastRCFrameCnt;
-if(RCFrameCnt!=LastRCFrameCnt)
+uint32_t RC_In=RCFrameCnt;
+if(RC_In!=LastRCFrameCnt)
 {
-  LastRCFrameCnt=RCFrameCnt;
+  LastRCFrameCnt=RC_In;
   return true;
 }
 return false;
 }
 
-bool newODO()
+uint32_t newODO()
 {
 static uint32_t myLastODOCnt;
-if(OdoCount!=myLastODOCnt)
+uint32_t ODO_In=OdoCount;
+if(ODO_In!=myLastODOCnt)
 {
-  myLastODOCnt=OdoCount;
-  return true;
+  uint32_t rv=ODO_In-myLastODOCnt;
+  myLastODOCnt=ODO_In;
+  return rv;
 }
-return false;
+return 0;
 }
 
 
 bool newServoFrame()
 {
 static uint32_t lastServoFrameCnt;
-if(ServoFrameCnt!=lastServoFrameCnt)
+uint32_t SF_In=ServoFrameCnt;
+if(SF_In!=lastServoFrameCnt)
 {
-lastServoFrameCnt=ServoFrameCnt;
+lastServoFrameCnt=SF_In;
 return true;
 }
 return false;
@@ -890,8 +903,8 @@ void UserMain(void * pd)
 		LastActiveMode =nActiveMode;
     LogRC();
    }
-
-   if(newODO())
+   uint32_t delta_odo=newODO();
+   if(delta_odo)
    {
 	 float head;
 	 static float last_head;
@@ -901,10 +914,14 @@ void UserMain(void * pd)
 		 head=RawHeading;
 
 		 float dist=(float)RunProps.ODODist;
+		 if(delta_odo!=1)
+		 {
+		  dist=(float)RunProps.ODODist*(float)delta_odo;
+		 }
+
 
          //Can't average headings...s
 		 float usehead=avg_angle(head,last_head);
-		
 		 float dx=dist*LookUpSinDeg(usehead);
 		 float dy=dist*LookUpCosDeg(usehead);
 		 last_head=head;
@@ -957,7 +974,9 @@ void UserMain(void * pd)
 		   {
 			   SetServoPos(MOTOR_SERVO,0); 
 		   }
-
+	   SFObj.steer=GetServoCount(STEER_SERVO);
+	   SFObj.motor=GetServoCount(MOTOR_SERVO);
+	   SFObj.Log();
 
    }
  }

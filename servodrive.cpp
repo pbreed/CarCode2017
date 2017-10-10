@@ -202,6 +202,10 @@ void SetServoRaw(int ch, int v)
 }
 
 
+int GetServoCount(int servo)
+{
+return ServoTimes[servo];
+}
 
 
 

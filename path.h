@@ -37,6 +37,13 @@ float m_edge_x;
 float m_edge_y;
 float m_edge_dist; //+ to right, - to left
 float m_Corner_dist; //+ to right - to left;
+float m_base_head;
+float m_ChordAngle;
+float m_arc_r;
+fPoint m_p1;
+fPoint m_p2;
+fPoint m_ArcCenter;
+
 char m_option[20];
 int next_seq; //Either next numeber or -1 to stop
 
@@ -48,33 +55,8 @@ bool m_bDoCorner;
 bool m_bCornerAdj_LR;
 bool m_bCornerAdj_FA;
 bool m_bCorner_Indent;
+bool m_bArc;
 bool m_bValid;
-
-path_element()
-{
-pt.x=0;
-pt.y=0;
-speed=0;
-m_CornerDet_Path_X=0;
-m_CornerDet_Path_Y=0;
-m_CornerAct_X=0;     
-m_CornerAct_Y=0;     
-m_edge_x=0;          
-m_edge_y=0;          
-m_edge_dist=0; //+ to
-m_Corner_dist =0;
-m_option[0]=0;
-next_seq=-1;
-m_bDoEdge=false;       
-m_edge_intercept=false;
-m_edge_adj_dist=false; 
-m_adj_head=false;      
-m_bDoCorner=false;     
-m_bCornerAdj_LR=false; 
-m_bCornerAdj_FA=false; 
-m_bCorner_Indent=false;
-m_bValid=false;         
-};
 
 void PathInitalValue()
 {
@@ -100,7 +82,16 @@ m_bCornerAdj_LR=false;
 m_bCornerAdj_FA=false; 
 m_bCorner_Indent=false;
 m_bValid=false;         
+m_bArc=false;
+m_base_head=0;
+m_ChordAngle=0;
 };
+
+path_element()
+{
+PathInitalValue();
+};
+
 
 bool Parse(const char * & cp,int def_next_seq);
 void Show();
