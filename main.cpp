@@ -460,17 +460,18 @@ void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
 	float xtk;
 	float ts;
 	float t_rotv;
-
+	float head=proj_head;
+ /*
 	float head;
 	if(RunProps.UseMag)
 	   head=IntegratedHeading;
 	   else
 	   head=RawHeading;
-	
-	if(RawPaths[CurPathIndex].NavCalc(CurPos,head,th,xtk,ts,t_rotv)) 
+  */  
+	if(RawPaths[CurPathIndex].NavCalc(proj_pt,proj_head,th,xtk,ts,t_rotv)) 
 	{
      NextPoint();
-	 DoNewNavCalcs(proj_pt,proj_head);
+	 if(!bStopHere) DoNewNavCalcs(proj_pt,proj_head);
 	 return;
 	}
     SegSpeed=ts;
@@ -510,11 +511,6 @@ void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
   else
   TargetHeading=th;
 
-  //Project up to one manuver ahead
-  if(!RawPaths[CurPathIndex].NavCalc(proj_pt,proj_head,th,xtk,ts,t_rotv))
-  {
-	SegRotv=t_rotv;
-  }
 
   NavCalcObj.xtk=xtk;
   NavCalcObj.hd=TargetHeading;
