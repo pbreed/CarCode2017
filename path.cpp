@@ -14,7 +14,12 @@
 #include "nav.h"
 #include "path.h"
 #include "introspec.h"
+#include "runprop.h"
 LOGFILEINFO;
+
+path_element PathArray[1000];
+raw_path RawPaths[1000];
+int num_raw_paths; 
 
 
 extern "C"
@@ -120,6 +125,7 @@ int ShowCurPath(int sock, const char* pUrl)
 
 	  if(PathArray[i].m_bArc)
 	  {
+
 	    fdprintf(sock,"<TD>true</TD><TD>%g</TD><TD>%g</TD>",PathArray[i].m_arc_r,PathArray[i].m_ChordAngle);
 		if(PathArray[i].m_ChordAngle<0)
 			fdprintf(sock,"<TD>left</TD></TR>\r\n");
@@ -131,6 +137,15 @@ int ShowCurPath(int sock, const char* pUrl)
 	i++;
   }
   fdprintf(sock,"</TABLE><BR>\r\n");
+
+
+  fdprintf(sock,"<BR>\r\n<TABLE border=\"1\">");
+  raw_path::RenderTableHead(sock);
+  for(int i=0; i<num_raw_paths; i++) RawPaths[i].RenderTable(sock);
+  fdprintf(sock,"</TABLE><BR>\r\n");
+
+
+
  return 1;
 }
 
@@ -174,8 +189,6 @@ void RegisterPost()
 
 extern const unsigned long PathDataLen;
 extern const unsigned char PathData[];
-
-path_element PathArray[1000];
 
 
 
@@ -256,6 +269,7 @@ if (*cp)
 	bOffset_Set=false;
 	while((*cp) && (*cp!=']') && (PathArray[n].Parse(cp,n+1)))
 		{
+
         if((PathArray[n].m_bDoEdge) && (n>0))
 		{
 		 fPoint pnext=PathArray[n].pt;
@@ -291,7 +305,10 @@ if (*cp)
 			 PathArray[n].m_Corner_dist=-dist;
 			 else
 			 PathArray[n].m_Corner_dist=dist;
+
 		}
+
+		
 
 
 		n++;
@@ -308,8 +325,122 @@ if (*cp)
     //iprintf("Parsed %d path points\r\n",n);
 	PathArray[n].m_bValid=false;
  }
+int n=1;
+int rn=0;
+
+/*
+ fPoint start_point;
+ fPoint end_point;
+ fPoint center_pt;
+ float radius;
+ float start_speed;
+ float end_speed;
+ float start_head;
+ float end_head;
+ float total_dist; 
+ path_element * ref_path_el;
+ bool bArc;
+*/
+
+while(PathArray[n].m_bValid)
+{
+path_element * pnext=PathArray+(n+1);
+path_element * pcur=PathArray+n;
+path_element * prev=PathArray+(n-1);
+
+RawPaths[rn].bArc=false;
+
+if(prev->m_bArc)
+{
+  RawPaths[rn].start_point=prev->m_p2;
+  RawPaths[rn].start_speed=prev->speed; 
+
 }
+else
+{
+  RawPaths[rn].start_point=prev->pt;
+  RawPaths[rn].start_speed=prev->speed; 
 }
+
+
+if ( pcur->m_bArc) 
+{
+	RawPaths[rn].end_point=pcur->m_p1;
+	RawPaths[rn].end_speed=pcur->speed; 
+
+	RawPaths[rn].bArc=false;
+	RawPaths[rn].ref_path_num=(n);
+    RawPaths[rn].total_dist=Calc_Distance(RawPaths[rn].start_point,RawPaths[rn].end_point);
+	RawPaths[rn].radius=0;
+	if(RawPaths[rn].total_dist>4)
+		{ 
+		RawPaths[rn].start_head=Calc_HeadDeg(RawPaths[rn].start_point,RawPaths[rn].end_point);
+		 RawPaths[rn].end_head=RawPaths[rn].start_head;
+		 RawPaths[rn].CalcLineStuff(); 
+		 rn++;
+		}
+	RawPaths[rn].start_point=pcur->m_p1;
+	RawPaths[rn].start_speed=pcur->speed; 
+	RawPaths[rn].end_point=pcur->m_p2;
+	RawPaths[rn].end_speed=pcur->speed; 
+	RawPaths[rn].center_pt=pcur->m_ArcCenter;
+	RawPaths[rn].radius=pcur->m_arc_r;
+	RawPaths[rn].ref_path_num=n;
+    if(pcur->m_ChordAngle>0)
+		RawPaths[rn].bLeftTurn=false;
+		else
+		RawPaths[rn].bLeftTurn=true;
+
+
+
+	RawPaths[rn].ref_path_num=n;
+	RawPaths[rn].start_head=RawPaths[rn-1].end_head;
+	RawPaths[rn].end_head=Calc_HeadDeg(pcur->pt,pnext->pt);
+	RawPaths[rn].total_dist=fabs(pcur->m_arc_r*pcur->m_ChordAngle*PI/180.0);
+	RawPaths[rn].bArc=true;
+	RawPaths[rn].CalcLineStuff(); 
+	rn++;
+}
+else
+{//We are a line
+//	if(pnext->m_bArc)
+//	{
+//		RawPaths[rn].end_point=pnext->m_p1;
+//		RawPaths[rn].end_speed=pnext->speed; 
+///
+//	}
+//	else
+	{	
+		RawPaths[rn].end_point=pcur->pt;
+		
+		if(pcur->next_seq==-1)
+			RawPaths[rn].end_speed=0; 
+		else
+			RawPaths[rn].end_speed=pcur->speed; 
+	}
+		
+	    RawPaths[rn].bArc=false;
+		RawPaths[rn].ref_path_num=n;
+		RawPaths[rn].total_dist=Calc_Distance(RawPaths[rn].start_point,RawPaths[rn].end_point);
+		RawPaths[rn].radius=0;
+		if(RawPaths[rn].total_dist>4)
+		{ 
+			RawPaths[rn].start_head=Calc_HeadDeg(RawPaths[rn].start_point,RawPaths[rn].end_point);
+			RawPaths[rn].end_head=RawPaths[rn].start_head;
+			RawPaths[rn].CalcLineStuff(); 
+			rn++;
+		}
+}//We are a line
+n++;
+}//While valid base points
+
+
+num_raw_paths=rn;
+}//We parse stuff cp!=null
+
+}
+
+
 
 void PopulatePath()
 {
@@ -526,6 +657,7 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
   trimlead(cp);
 
  PathInitalValue();
+ speed=RunProps.DefSpeed;
  next_seq=def_next_seq;
 
  if(*cp!='{') return false;
@@ -644,7 +776,7 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
 	 {
 		 speed=ReadFNumber(cp);
 	 } else
-		 speed=-1;
+		 speed=RunProps.DefSpeed;
 
      }
    else
@@ -691,4 +823,159 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
 
 
 
+float turn_angle(float cur_a, float next_a)
+{
+float a=(next_a-cur_a);
+if(a<-180) a+=360;
+if(a>180) a-=360;
+return a;
+}
+
+float add_angle(float cur_a, float change)
+{
+ float a=cur_a+change;
+ if(a<-180) a+=360;
+ if(a>180) a-=360;
+ return a;
+}
+
+
+
+ /*fPoint start_point;
+ fPoint end_point;
+ fPoint center_pt;
+ float radius;
+ float start_speed;
+ float end_speed;
+ float start_head;
+ float end_head;
+ float total_dist;
+ int  ref_path_num;
+ bool bArc;
+ */
+
+
+/* float line_dx;        
+ float line_dy;        
+ float cross_a;        
+ float cross_b;        
+ float inverse_caroot; 
+*/
+
+
+void raw_path::CalcLineStuff()
+{
+line_dx=end_point.x-start_point.x;
+line_dy=end_point.y-start_point.y;
+if(line_dx!=0)
+{
+cross_a = (end_point.y - start_point.y) / (end_point.x - start_point.x);
+cross_b = end_point.y - cross_a * end_point.x;
+inverse_caroot= inv_sqrt(cross_a * cross_a + 1);
+}
+}
+
+
+
+//Returns true if time to to do next point
+//xtk is -left + right
+bool raw_path::LineCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed)
+{
+ best_head=start_head;
+ targ_speed=start_speed;
+
+//We know line dx and line dy
+if(line_dx==0)
+{//Veritcal line.
+ if(line_dy>0)
+	 {//headed north
+	 return (pos.x-end_point.x);
+     }
+	else
+    {//headed south
+	 return (end_point.x-pos.x);
+	}
+ }
+//Now the hard cases we are not DXor Dy=0
+float  dist = (cross_a * pos.x + cross_b - pos.y)*inverse_caroot;
+if(line_dx<0) xtk=-dist;
+else xtk=dist;
+
+ float head_to=end_point.HeadToHereDeg(pos);
+ float ta=turn_angle(head_to,best_head);
+ if((ta>90) || (ta<(-90))) return true;
+ return false;
+}
+
+
+
+
+
+
+
+
+//Returns true if time to to do next point
+//xtk is -left + right
+bool raw_path::ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed)
+{
+ float dist=center_pt.Dist(pos);            
+ float head_to=center_pt.HeadToHereDeg(pos); 
+ if(bLeftTurn) 
+	{head_to+=90;
+	//- for dist too big...
+	//Course change will handle wrong side...
+	 xtk=dist-radius;
+    }
+ else
+	{ 
+	 //-+for dist too big...
+	 head_to-=90; 
+	 xtk=radius-dist;
+    }
+
+  targ_speed=start_speed;
+
+ if(head_to>180) head_to-=360;
+ if(head_to<(-180)) head_to+=360;
+ best_head=head_to;
+ 
+
+ if(turn_angle(head_to,end_head)<0)
+ {//Left turn to end heading
+  return !bLeftTurn;
+ }
+	 
+ //Right turn to end heading
+    return bLeftTurn;
+}
+
+
+//Returns true if time to to do next point
+//xtk is -left + right
+bool raw_path::NavCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed)
+{
+if (bArc) 
+	return ArcCalc(pos,cur_head,best_head,xtk,targ_speed);
+   else
+   return LineCalc(pos,cur_head,best_head,xtk,targ_speed);
+}
+
+
+void raw_path::RenderTable(int fd )
+{
+	fdprintf(fd,"<TR><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%d</TD>",
+				start_point.x, start_point.y, end_point.x,end_point.y,total_dist,start_head,end_head,radius,start_speed ,end_speed,ref_path_num);
+	if(!bArc)
+		fdprintf(fd,"<TD></TD></TR>\r\n");
+	else
+	if(bLeftTurn) 
+		fdprintf(fd,"<TD>Left</TD></TR>\r\n");
+	else
+		fdprintf(fd,"<TD>Right</TD></TR>\r\n");
+
+}
+void raw_path::RenderTableHead(int fd)
+{
+   fdprintf(fd,"<TR><TH>Sx</TH><TH>Sy</TH><TH>Ex</TH><TH>Ey</TH><TH>Dist</TH><TH>Sh</TH><TH>Eh</TH><TH>Rad</TH><TH>Spd st</TH><TH>Spd end</TH><TH>#</TH><TH>L/R</TH></TR>\r\n");
+}
 

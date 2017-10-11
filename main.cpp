@@ -33,27 +33,8 @@
 #include "nav.h"
 #include "path.h"
 #include "SimpleAD.h"
-
+#include "runprop.h"
 LOGFILEINFO;
-
-class RunProperties:public config_obj
-{
-public:
-RunProperties():config_obj(appdata,"RunProp") {};
-    config_int    CalTime{20,"CalTime"};
-    config_bool   UseMag{true,"UseMag"};
-	config_bool    StopOnRcLoss{true,"saferc"};
-	config_double SteerZero{0.00,"SteerZero"};
-    config_double ODODist{4.58,"OdoDist"};
-	config_double CrossAngleScale{1,"XandScale"};
-	config_double CrossMaxCorrect{45,"MaxCorrect"};
-	config_double SteerP{0.02,"SteerP"};
-	config_double SteerD{0,"SteerD"};
-	config_double SteerI{0,"SteerI"};
-	config_double Thro{0.1,"Thro"};
-	config_double Brake{0.50,"Brake"};
-	ConfigEndMarker;
-};
 
 
 
@@ -81,6 +62,11 @@ extern int32_t ZeroCount;
 volatile uint32_t OdoCount;
 volatile uint32_t DtOdoCount;
 volatile uint32_t LastOdoTime;
+
+float calc_speed;
+
+const float SPEED_CONST = (125000000*4.58*3600)/(5280*12); //(Clock * In_per_odo * sec_perhour)/(ft_per_mile*in_per_feet)
+
 
 
 
@@ -219,8 +205,8 @@ if(RCFrameCnt!=LastCount)
 }
 
 START_INTRO_OBJ(RCDriveObj,"RCDrive")
-uint16_element steer{"steer"};
-uint16_element motor{"motor"};
+uint32_element steer{"steer"};
+uint32_element motor{"motor"};
 END_INTRO_OBJ;
 
 RCDriveObj SFObj;
@@ -310,16 +296,8 @@ END_INTRO_OBJ;
 
 
 START_INTRO_OBJ(NextPointRec,"NextPt")
+int32_element rp{"rp"};
 int32_element cp{"cp"};
-int32_element np{"np"};
-float_element nx{"nx"};
-float_element ny{"ny"};
-float_element ty{"ty"};
-float_element tx{"tx"};
-float_element bh{"bh"};
-float_element sa{"sa"};
-float_element speed{"speed"};
-uint32_element stop{"stop"};
 END_INTRO_OBJ;
 
 
@@ -328,10 +306,10 @@ END_INTRO_OBJ;
 START_INTRO_OBJ(NavCalcRec,"NavCalc")
 float_element xtk{"xtk"};
 float_element hd{"hd"};
+float_element th{"th"};
+float_element xh{"xh"};
 float_element x{"x"};
 float_element y{"y"};
-float_element htd{"htd"};
-float_element propt{"propt"};
 END_INTRO_OBJ;
 
 
@@ -347,6 +325,23 @@ static fPoint  CurPos;
 
 const float max_steer =0.75;
 const float min_steer =-0.75;
+
+//Throttle 0.33= 18 mph
+//		   0.2=	 11 mph
+//		   0.125 =4.5
+//y=mx+b
+//
+
+
+float ManageSpeed(float target_speed)
+{
+float sv=(target_speed*(float)RunProps.Speed_M)+(float)RunProps.Speed_B;
+float err=target_speed-calc_speed;
+//Lets try 0.1 per 5mph  0.1/5 = 0.02
+
+return sv+((float)RunProps.Speed_G*err);
+
+}
 
    //zot
 void Steer()
@@ -398,62 +393,13 @@ void ProcessNewImuData()
 }
 
 static int CurPathIndex;
-static fPoint FromPt;
-static fPoint ToPt;
-static float base_head;
 static float SegSpeed;
-static float next_head;
-static float split_angle;
 static bool bStopHere;
-static float line_dx;
-static float line_dy;
-static float cross_a;
-static float cross_b;
-static float inverse_caroot;
 
 
 
 
-//- is left of cource, + is right of course
-float CalcCrossTrack()
-{
-//We know line dx and line dy
 
-if(line_dx==0)
-{//Veritcal line.
-
- if(line_dy>0)
-	 {//headed north
-	 return (CurPos.x-ToPt.x);
-     }
-	else
-    {//headed south
-	 return (ToPt.x-CurPos.x);
-	}
- }
-//Now the hard cases we are not DXor Dy=0
-float  dist = (cross_a * CurPos.x + cross_b - CurPos.y)*inverse_caroot;
-if(line_dx<0) return -dist;
-return dist;
-}
-
-
-
-float turn_angle(float cur_a, float next_a)
-{
-float a=(next_a-cur_a);
-if(a<-180) a+=360;
-if(a>180) a-=360;
-return a;
-}
-
-float add_angle(float cur_a, float change)
-{
- float a=cur_a+change;
- if(a<-180) a+=360;
- if(a>180) a-=360;
- return a;
-}
 
 
 float avg_angle(float a1, float a2)
@@ -476,64 +422,15 @@ void DoNewNavCalcs();
 
 void NextPoint()
 {
-	FromPt=PathArray[CurPathIndex].pt;
-	int np=PathArray[CurPathIndex].next_seq;
-	if((np<0) || (PathArray[np].m_bValid==false))
-	{
-	   bStopHere=true;
 
-	   SegSpeed=PathArray[CurPathIndex].speed; 
-	   NextPointObj.cp=CurPathIndex;
-	   NextPointObj.np=np;
-	   NextPointObj.nx=ToPt.x;
-	   NextPointObj.ny=ToPt.y;
-	   NextPointObj.tx=FromPt.x;
-	   NextPointObj.ty=FromPt.y;
-	   NextPointObj.bh=base_head;
-	   NextPointObj.sa=base_head;
-	   NextPointObj.stop=true;
-	   NextPointObj.speed=PathArray[CurPathIndex].speed; ;
-	   NextPointObj.Log();
-
-
-	   return;
-	}
-	CurPathIndex=np;
-	bStopHere=false;
-	
-	SegSpeed=PathArray[CurPathIndex].speed;
-	
-	ToPt=PathArray[CurPathIndex].pt;
-    base_head=ToPt.HeadToHereDeg(FromPt);
-	if((PathArray[CurPathIndex].next_seq<0) || (PathArray[PathArray[CurPathIndex].next_seq].m_bValid==false))
-	{
-	next_head=base_head;
-	}
-	else
-	{
-	 next_head=PathArray[PathArray[CurPathIndex].next_seq].HeadToHereDeg(ToPt);
+	if(RawPaths[CurPathIndex].end_speed!=0)	CurPathIndex++;
+    else
+	{bStopHere=true;
+	 return;
 	}
 
-	split_angle=avg_angle(base_head,next_head);
-	line_dx=ToPt.x-FromPt.x;
-	line_dy=ToPt.y-FromPt.y;
-	
-	if(line_dx!=0)
-	{
- 	cross_a = (ToPt.y - FromPt.y) / (ToPt.x - FromPt.x);
-	cross_b = ToPt.y - cross_a * ToPt.x;
-	inverse_caroot= inv_sqrt(cross_a * cross_a + 1);
-	}
-	NextPointObj.cp=CurPathIndex;
-	NextPointObj.np=PathArray[CurPathIndex].next_seq;
-	NextPointObj.nx=ToPt.x;
-	NextPointObj.ny=ToPt.y;
-	NextPointObj.tx=FromPt.x;
-	NextPointObj.ty=FromPt.y;
-	NextPointObj.bh=base_head;
-	NextPointObj.sa=split_angle;
-	NextPointObj.stop=bStopHere;
-	NextPointObj.speed=SegSpeed;
+    NextPointObj.rp=CurPathIndex;
+    NextPointObj.cp=RawPaths[CurPathIndex].ref_path_num;
 	NextPointObj.Log();
 	DoNewNavCalcs();
 
@@ -541,47 +438,65 @@ void NextPoint()
 
 void DoNewNavCalcs()
 {
-
-
-    float head_to_dest=ToPt.HeadToHereDeg(CurPos);
-    float prop_turn=turn_angle(head_to_dest,split_angle);
-
-	//head_to_Dest is direction directly to the current wp
-	//split angle is the bisector fo the two current headings
-	//So prop turn is how many degree change from head to and split if the turn is mroe than 90
-	//we shoudl go to next wp
-    if((prop_turn>90) || (prop_turn<-90))
-		{
-		NextPoint();
-		}
-
 //	zot      
- float head;
- if(RunProps.UseMag)
-	head=IntegratedHeading;
-	else
-	head=RawHeading;
+
+	float th;
+	float xtk;
+	float ts;
+
+	float head;
+	if(RunProps.UseMag)
+	   head=IntegratedHeading;
+	   else
+	   head=RawHeading;
+	
+	if(RawPaths[CurPathIndex].NavCalc(CurPos,head,th,xtk,ts)) 
+	{
+     NextPoint();
+	 return;
+	}
+    SegSpeed=ts;
 
  
-  float xtk=CalcCrossTrack();
  float xh=0;
- //If we are not withing 45 deg of heading Xtrak doe snot matter...
- if(fabs(turn_angle(head,base_head))<45)
- { xh=-xtk*(float)RunProps.CrossAngleScale;
+  xh=-xtk*(float)RunProps.CrossAngleScale;
   if(xh<-(float)RunProps.CrossMaxCorrect) xh=-(float)RunProps.CrossMaxCorrect;
   if(xh> (float)RunProps.CrossMaxCorrect) xh=(float)RunProps.CrossMaxCorrect;
- }
-  xh+=base_head;
+ 
+
+  //th is the direction we are headed for....
+  //When TH is WAAAAAY off we have to make sure that 
+  //The cross track does not push us beyond the 180 deg point...
+
+  
+  xh+=th;
   if(xh>180) xh-=360;
   if(xh<-180) xh+=360;
-  TargetHeading=xh;
+
+  float rerr=(th-head);
+  if(rerr>180) rerr-=360;
+  if(rerr<-180) rerr+=360;
+
+  float err=(xh-head);
+  if(err>180) err-=360;
+  if(err<-180) err+=360;
+
+  //If both errors are same sign after scaling then were good
+  if((rerr<0) &&(err<0)) TargetHeading=xh;
+  else
+  if((rerr>0) &&(err>0)) TargetHeading=xh;
+  else
+  if(fabs(rerr)<(float)RunProps.CrossMaxCorrect)
+	  TargetHeading=xh; 
+  else
+  TargetHeading=th;
 
   NavCalcObj.xtk=xtk;
   NavCalcObj.hd=TargetHeading;
+  NavCalcObj.xh=xh;
+  NavCalcObj.th=th;
   NavCalcObj.x=CurPos.x;
   NavCalcObj.y=CurPos.y;
-  NavCalcObj.htd=head_to_dest;
-  NavCalcObj.propt=prop_turn;
   NavCalcObj.Log();
 }
 
@@ -597,13 +512,12 @@ void ModeChange(int new_mode, int prev_mode)
  mco.Log();
  if((prev_mode==0) && (new_mode!=0))
  {
-	 CurPos=PathArray[0].pt;
+	 CurPos=RawPaths[0].start_point;
      CurPathIndex=0;
 
   if(!RunProps.UseMag)
   {
-   float head=PathArray[1].HeadToHereDeg(PathArray[0]);
-   SetRawHeading(head);
+   SetRawHeading(RawPaths[0].start_head);
   }
   NextPoint();
 
@@ -906,8 +820,15 @@ void UserMain(void * pd)
    uint32_t delta_odo=newODO();
    if(delta_odo)
    {
+	   if(DtOdoCount==0)
+		calc_speed=0;
+		   else
+	    calc_speed=SPEED_CONST/(float)DtOdoCount;
+
+
 	 float head;
 	 static float last_head;
+
      if(RunProps.UseMag)
 		 head=IntegratedHeading;
 		 else
@@ -966,9 +887,13 @@ void UserMain(void * pd)
 		   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
 		 else
 		   if(SegSpeed>-1)
-		   SetServoPos(MOTOR_SERVO,SegSpeed);
+		   {if(SegSpeed<1)
+            SetServoPos(MOTOR_SERVO,SegSpeed);
+		    else
+			 SetServoPos(MOTOR_SERVO,ManageSpeed(SegSpeed));
+		   }
 			   else
-		   SetServoPos(MOTOR_SERVO,RunProps.Thro);
+		   SetServoPos(MOTOR_SERVO,ManageSpeed((float)RunProps.DefSpeed));
 		}
 		   if(bRCFrameError && RunProps.StopOnRcLoss)
 		   {

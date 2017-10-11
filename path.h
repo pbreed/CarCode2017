@@ -102,9 +102,44 @@ float HeadToHereDeg(const path_element & p){return pt.HeadToHereDeg(p.pt); };
 };
 
 
+struct raw_path
+{fPoint start_point;
+ fPoint end_point;
+
+ //Arc stuff
+ fPoint center_pt;
+ float radius;
+ float start_head;
+ float end_head;
 
 
-extern path_element PathArray[];
+ //Line stuff
+ float line_dx;        
+ float line_dy;        
+ float cross_a;        
+ float cross_b;        
+ float inverse_caroot; 
+
+
+ float start_speed;
+ float end_speed;
+ float total_dist;
+ int  ref_path_num;
+ bool bArc;
+ bool bLeftTurn;
+ //Returns true if time to to do next point
+ bool NavCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed);
+ bool ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed);
+ bool LineCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed);
+ void CalcLineStuff();
+
+ void RenderTable(int fd );
+static void RenderTableHead(int fd);
+};
+
+extern raw_path RawPaths[];
+extern int num_raw_paths;
+//extern path_element PathArray[];
 void PopulatePath();
 
 
