@@ -287,6 +287,8 @@ END_INTRO_OBJ;
 START_INTRO_OBJ(CurPosObj,"POS")
 float_element x{"x"};
 float_element y{"y"};
+float_element px{"px"};
+float_element py{"py"};
 uint32_element pc{"pointcnt"};
 uint32_element dt{"dt"};
 uint32_element sn{"sn"};
@@ -432,8 +434,6 @@ float v;
  return v;
 }
 
-void DoNewNavCalcs();
-
 
 
 
@@ -449,11 +449,10 @@ void NextPoint()
     NextPointObj.rp=CurPathIndex;
     NextPointObj.cp=RawPaths[CurPathIndex].ref_path_num;
 	NextPointObj.Log();
-	DoNewNavCalcs();
 
 }
 
-void DoNewNavCalcs()
+void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
 {
 //	zot      
 
@@ -471,6 +470,7 @@ void DoNewNavCalcs()
 	if(RawPaths[CurPathIndex].NavCalc(CurPos,head,th,xtk,ts,t_rotv)) 
 	{
      NextPoint();
+	 DoNewNavCalcs(proj_pt,proj_head);
 	 return;
 	}
     SegSpeed=ts;
@@ -510,6 +510,12 @@ void DoNewNavCalcs()
   else
   TargetHeading=th;
 
+  //Project up to one manuver ahead
+  if(!RawPaths[CurPathIndex].NavCalc(proj_pt,proj_head,th,xtk,ts,t_rotv))
+  {
+	SegRotv=t_rotv;
+  }
+
   NavCalcObj.xtk=xtk;
   NavCalcObj.hd=TargetHeading;
   NavCalcObj.ts=SegSpeed;
@@ -538,8 +544,16 @@ void ModeChange(int new_mode, int prev_mode)
   if(!RunProps.UseMag)
   {
    SetRawHeading(RawPaths[0].start_head);
+   NextPoint();
+   DoNewNavCalcs(CurPos,RawHeading);
   }
-  NextPoint();
+  else
+  {
+   NextPoint();
+   DoNewNavCalcs(CurPos,IntegratedHeading);
+
+  }
+
 
  }
 
@@ -883,9 +897,26 @@ void UserMain(void * pd)
 		 cpo.dt=(t2-t1);
 		 bLidarRight=true;
 
+		 //We want to project 200msec ahead...
+		 int ProjectDist=(25000000/DtOdoCount);
+		 fPoint ProjectPos=CurPos;
+		 float deltahead=turn_angle(last_head,head);
+
+		 for(int i=0; i<ProjectDist; i++)
+		 {
+		  usehead+=deltahead;
+		  dx=dist*LookUpSinDeg(usehead);
+		  dy=dist*LookUpCosDeg(usehead);
+          ProjectPos.x+=dx;
+          ProjectPos.y+=dy;
+		 }
+
+		 cpo.px=ProjectPos.x;
+		 cpo.py=ProjectPos.y;
+
 		 if(nActiveMode!=0)
 			 { 
-			  DoNewNavCalcs();
+			  DoNewNavCalcs(ProjectPos,usehead);
 			 };
 
         cpo.Log();
