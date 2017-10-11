@@ -64,8 +64,11 @@ volatile uint32_t DtOdoCount;
 volatile uint32_t LastOdoTime;
 
 float calc_speed;
-
+float last_motor;
 const float SPEED_CONST = (125000000*4.58*3600)/(5280*12); //(Clock * In_per_odo * sec_perhour)/(ft_per_mile*in_per_feet)
+static int CurPathIndex;
+static float SegSpeed;
+static bool bStopHere;
 
 
 
@@ -204,13 +207,6 @@ if(RCFrameCnt!=LastCount)
   }
 }
 
-START_INTRO_OBJ(RCDriveObj,"RCDrive")
-uint32_element steer{"steer"};
-uint32_element motor{"motor"};
-END_INTRO_OBJ;
-
-RCDriveObj SFObj;
-
 
 
 START_INTRO_OBJ(RCStateObj,"RCCh")
@@ -279,7 +275,10 @@ START_INTRO_OBJ(SteerLoopObj,"SteerLoop")
 float_element t{"targ"};
 float_element e{"err"};
 float_element i{"ierr"};
+float_element steer{"steer"};
+float_element motor{"motor"};
 uint8_element m{"move"};
+
 END_INTRO_OBJ;
 
 
@@ -308,6 +307,7 @@ float_element xtk{"xtk"};
 float_element hd{"hd"};
 float_element th{"th"};
 float_element xh{"xh"};
+float_element ts{"tspeed"};
 float_element x{"x"};
 float_element y{"y"};
 END_INTRO_OBJ;
@@ -367,7 +367,8 @@ void Steer()
  slo.t=TargetHeading;
  slo.e=err;
 
- SetServoPos(0,-sv+(float)RunProps.SteerZero);
+ sv-=(float)RunProps.SteerZero;
+ SetServoPos(0,-sv);
 
 if(bIsMoving())
 {
@@ -379,6 +380,8 @@ else
  slo.m=0;
 }
 slo.i=ierr;
+slo.steer=-sv;
+slo.motor=last_motor;
 slo.Log();
 }
 
@@ -391,10 +394,6 @@ void ProcessNewImuData()
 
 
 }
-
-static int CurPathIndex;
-static float SegSpeed;
-static bool bStopHere;
 
 
 
@@ -493,6 +492,7 @@ void DoNewNavCalcs()
 
   NavCalcObj.xtk=xtk;
   NavCalcObj.hd=TargetHeading;
+  NavCalcObj.ts=SegSpeed;
   NavCalcObj.xh=xh;
   NavCalcObj.th=th;
   NavCalcObj.x=CurPos.x;
@@ -873,36 +873,45 @@ void UserMain(void * pd)
 
    if(newServoFrame())
    {
-	   if(nActiveMode==0)
+	   switch (nActiveMode)
+	   {
+	   case 0:
+		    {
+			 SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
+             SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+			}
+	   break;
+	    case 1:
 		   {
-		    SetServoRaw(STEER_SERVO,rc_ch[1]); //Steer
-            SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
-	       }
-	   else
-		 {
-		 Steer();
-		 if(bStopHere) SetServoPos(MOTOR_SERVO,-(fabs((float)RunProps.Brake)));
-		  else
-		 if(nActiveMode==1)
-		   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
-		 else
-		   if(SegSpeed>-1)
-		   {if(SegSpeed<1)
-            SetServoPos(MOTOR_SERVO,SegSpeed);
-		    else
-			 SetServoPos(MOTOR_SERVO,ManageSpeed(SegSpeed));
-		   }
+			   if(bStopHere) 
+			   { last_motor=-(fabs((float)RunProps.Brake));
+			     SetServoPos(MOTOR_SERVO,last_motor);
+			   }
 			   else
-		   SetServoPos(MOTOR_SERVO,ManageSpeed((float)RunProps.DefSpeed));
-		}
-		   if(bRCFrameError && RunProps.StopOnRcLoss)
-		   {
-			   SetServoPos(MOTOR_SERVO,0); 
-		   }
-	   SFObj.steer=GetServoCount(STEER_SERVO);
-	   SFObj.motor=GetServoCount(MOTOR_SERVO);
-	   SFObj.Log();
+			   SetServoRaw(MOTOR_SERVO,rc_ch[2]); //Throttle
+			   Steer();
+           }
+		break;
+	   case 2:
+		  {
+			  if(bStopHere) 
+			  { last_motor=-(fabs((float)RunProps.Brake));
+			  }
+			  else
+			  {
+				  last_motor=ManageSpeed(SegSpeed);
+			  }
+			  SetServoPos(MOTOR_SERVO,last_motor);
+			  Steer();
+		  }
+	   break;
+	   }
 
+	    if(bRCFrameError && RunProps.StopOnRcLoss)
+	     {
+	   	   SetServoPos(MOTOR_SERVO,0); 
+	   	   last_motor=0;
+	    }
    }
  }
 

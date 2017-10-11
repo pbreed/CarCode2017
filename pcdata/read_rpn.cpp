@@ -164,7 +164,8 @@ while((*np) && (!isspace(*np))) dname+=(*np++);
 }
 else
 {
-dname=ObjName+'.'+FieldName;
+//dname=ObjName+'.'+FieldName;
+dname=FieldName;
 }
 
 
