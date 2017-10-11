@@ -13,6 +13,9 @@ float Calc_HeadDeg(const fPoint &pfrom,const  fPoint &pto);
 
 float inv_sqrt( float number );
 
+float turn_angle(float cur_a, float next_a);
+
+
 
 
 

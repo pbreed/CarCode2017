@@ -13,6 +13,7 @@ RunProperties():config_obj(appdata,"RunProp") {};
 	config_double SteerP{0.02,"SteerP"};
 	config_double SteerD{0,"SteerD"};
 	config_double SteerI{0,"SteerI"};
+	config_double SteerVE{0.002,"SteerVE"};
 	config_double Brake{0.50,"Brake"};
 	config_double DefSpeed{6.0,"DefSpeed"};
 	config_double Speed_G{0.02,"SpeedG"};

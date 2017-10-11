@@ -865,8 +865,19 @@ float add_angle(float cur_a, float change)
 
 void raw_path::CalcLineStuff()
 {
+if(bArc)
+{
+ //Given speed and radius we want rotvel in deg/sec
+float circ=radius*2.0*PI;
+float ips=start_speed*5280*12/3600.0; //mph ->ips
+targ_rotv=360*ips/circ;
+if(bLeftTurn) targ_rotv=-targ_rotv;
+}
+else
+{
 line_dx=end_point.x-start_point.x;
 line_dy=end_point.y-start_point.y;
+targ_rotv=0;
 if(line_dx!=0)
 {
 cross_a = (end_point.y - start_point.y) / (end_point.x - start_point.x);
@@ -874,16 +885,17 @@ cross_b = end_point.y - cross_a * end_point.x;
 inverse_caroot= inv_sqrt(cross_a * cross_a + 1);
 }
 }
+}
 
 
 
 //Returns true if time to to do next point
 //xtk is -left + right
-bool raw_path::LineCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed)
+bool raw_path::LineCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed,float & t_rotv)
 {
  best_head=start_head;
  targ_speed=start_speed;
-
+ t_rotv=0;
 //We know line dx and line dy
 if(line_dx==0)
 {//Veritcal line.
@@ -916,10 +928,12 @@ else xtk=dist;
 
 //Returns true if time to to do next point
 //xtk is -left + right
-bool raw_path::ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed)
+bool raw_path::ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed,float & t_rotv)
 {
  float dist=center_pt.Dist(pos);            
  float head_to=center_pt.HeadToHereDeg(pos); 
+ t_rotv=targ_rotv;
+
  if(bLeftTurn) 
 	{head_to+=90;
 	//- for dist too big...
@@ -952,12 +966,12 @@ bool raw_path::ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, fl
 
 //Returns true if time to to do next point
 //xtk is -left + right
-bool raw_path::NavCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed)
+bool raw_path::NavCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed,float & t_rotv)
 {
 if (bArc) 
-	return ArcCalc(pos,cur_head,best_head,xtk,targ_speed);
+	return ArcCalc(pos,cur_head,best_head,xtk,targ_speed,t_rotv);
    else
-   return LineCalc(pos,cur_head,best_head,xtk,targ_speed);
+   return LineCalc(pos,cur_head,best_head,xtk,targ_speed,t_rotv);
 }
 
 

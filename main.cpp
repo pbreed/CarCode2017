@@ -66,9 +66,10 @@ volatile uint32_t LastOdoTime;
 float calc_speed;
 float last_motor;
 const float SPEED_CONST = (125000000*4.58*3600)/(5280*12); //(Clock * In_per_odo * sec_perhour)/(ft_per_mile*in_per_feet)
-static int CurPathIndex;
-static float SegSpeed;
-static bool bStopHere;
+int CurPathIndex;
+float SegSpeed;
+bool bStopHere;
+float SegRotv;
 
 
 
@@ -275,6 +276,7 @@ START_INTRO_OBJ(SteerLoopObj,"SteerLoop")
 float_element t{"targ"};
 float_element e{"err"};
 float_element i{"ierr"};
+float_element rve{"rverr"};
 float_element steer{"steer"};
 float_element motor{"motor"};
 uint8_element m{"move"};
@@ -347,6 +349,8 @@ return sv+((float)RunProps.Speed_G*err);
 void Steer()
 {
  static float ierr;
+ static float last_heading;
+
 
  float head;
  if(RunProps.UseMag)
@@ -354,16 +358,28 @@ void Steer()
 	else
 	head=RawHeading;
 
+ float cur_rot_dps=turn_angle(last_heading,head)*50; //Magicv 50 is RC frame rate 
+
+ float rotv_error=(SegRotv-cur_rot_dps); //left is minus
+
 
  float err=(TargetHeading-head);
  if(err>180) err-=360;
  if(err<-180) err+=360;
 
- float sv=(float)RunProps.SteerP*err+ (float)RunProps.SteerI*ierr+(float)RunProps.SteerD*(float)RotVel[2]/1000.0;
+ float sv=(float)RunProps.SteerP*err+ 
+	      (float)RunProps.SteerI*ierr+
+          ((float)RunProps.SteerD*(float)RotVel[2]/1000.0)
+		  +(float)RunProps.SteerVE*rotv_error
+	      ;
+
+	      
+
+
 
  if(sv>max_steer) sv=max_steer;
  if(sv<min_steer) sv=min_steer;
-
+ slo.rve=rotv_error;
  slo.t=TargetHeading;
  slo.e=err;
 
@@ -383,6 +399,8 @@ slo.i=ierr;
 slo.steer=-sv;
 slo.motor=last_motor;
 slo.Log();
+
+last_heading=head;
 }
 
 
@@ -442,6 +460,7 @@ void DoNewNavCalcs()
 	float th;
 	float xtk;
 	float ts;
+	float t_rotv;
 
 	float head;
 	if(RunProps.UseMag)
@@ -449,12 +468,13 @@ void DoNewNavCalcs()
 	   else
 	   head=RawHeading;
 	
-	if(RawPaths[CurPathIndex].NavCalc(CurPos,head,th,xtk,ts)) 
+	if(RawPaths[CurPathIndex].NavCalc(CurPos,head,th,xtk,ts,t_rotv)) 
 	{
      NextPoint();
 	 return;
 	}
     SegSpeed=ts;
+	SegRotv=t_rotv;
 
  
  float xh=0;

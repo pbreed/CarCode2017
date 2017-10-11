@@ -112,6 +112,9 @@ struct raw_path
  float start_head;
  float end_head;
 
+ //Speed up turns stuff 
+ float targ_rotv;  //in deg/per sec - is left + is right
+
 
  //Line stuff
  float line_dx;        
@@ -127,10 +130,12 @@ struct raw_path
  int  ref_path_num;
  bool bArc;
  bool bLeftTurn;
+
+
  //Returns true if time to to do next point
- bool NavCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed);
- bool ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed);
- bool LineCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed);
+ bool NavCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed,float & t_rotv);
+ bool ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed,float & t_rotv);
+ bool LineCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed,float & t_rotv);
  void CalcLineStuff();
 
  void RenderTable(int fd );
