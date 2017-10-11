@@ -61,17 +61,20 @@ void CoreRcTimer(int ch)
 	case MODE_SERVO_PULSE:
 			ntrr=(SERVO_INTERVAL-ServoElapsed[ch]);
 			ServoMode[ch]=MODE_SERVO_WAIT;
+			if(ch==0)
+				{if(pNotifyNextFrameSem) pNotifyNextFrameSem->Post();
+			 	 ServoFrameCnt++;
+			    }
+
 		 break;
 	case MODE_SERVO_WAIT:
 			 ServoElapsed[ch]=ServoTimes[ch];
              ntrr=ServoTimes[ch];
 		     ServoMode[ch]=MODE_SERVO_PULSE;
-			 if(pNotifyNextFrameSem) pNotifyNextFrameSem->Post();
             break;
 	}
 
 		sim2.timer[ch].trr=ntrr;
-		ServoFrameCnt++;
 }
 
 

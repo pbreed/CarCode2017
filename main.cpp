@@ -242,7 +242,7 @@ RcLog.Log();
 }
 
 
-float TargetHeading;
+float TargetHeading FAST_USER_VAR;
 
 bool bIsMoving()
 {
@@ -268,6 +268,10 @@ END_INTRO_OBJ;
 
 START_INTRO_OBJ(BootSecObj,"BootSecs")
 uint32_element s{"Secs"};
+uint32_element nRc{"nRc"};
+uint32_element nOdo{"nOdo"};
+uint32_element nSf{"nSf"};
+
 END_INTRO_OBJ;
 
 
@@ -275,11 +279,13 @@ END_INTRO_OBJ;
 START_INTRO_OBJ(SteerLoopObj,"SteerLoop")
 float_element t{"targ"};
 float_element e{"err"};
-float_element i{"ierr"};
-float_element rve{"rverr"};
+//float_element i{"ierr"};
+//float_element rve{"rverr"};
 float_element steer{"steer"};
 float_element motor{"motor"};
-uint8_element m{"move"};
+uint32_element dt{"sldt"};
+//uint8_element m{"move"};
+
 
 END_INTRO_OBJ;
 
@@ -293,6 +299,11 @@ uint32_element pc{"pointcnt"};
 uint32_element dt{"dt"};
 uint32_element sn{"sn"};
 uint32_element tc{"tc"};
+uint32_element nproj{"nproj"};
+uint32_element dt1{"dt1"};
+uint32_element dt2{"dt2"};
+uint32_element dt3{"dt3"};
+uint32_element dto{"dto"};
 int32_element b{"b"};
 END_INTRO_OBJ;
 
@@ -314,17 +325,19 @@ float_element xh{"xh"};
 float_element ts{"tspeed"};
 float_element x{"x"};
 float_element y{"y"};
+uint32_element dt1{"dt1"};
+uint32_element dt{"dt"};
 END_INTRO_OBJ;
 
 
-static NextPointRec NextPointObj;
-static NavCalcRec NavCalcObj;
-static ModeChangeObj mco;
-static SteerLoopObj slo;
-static BootSecObj   bso;
-static CurPosObj    cpo;
+static NextPointRec NextPointObj FAST_USER_VAR;
+static NavCalcRec NavCalcObj FAST_USER_VAR;
+static ModeChangeObj mco FAST_USER_VAR;
+static SteerLoopObj slo FAST_USER_VAR;
+static BootSecObj   bso FAST_USER_VAR;
+static CurPosObj    cpo FAST_USER_VAR;
 
-static fPoint  CurPos;
+static fPoint  CurPos FAST_USER_VAR;
 
 
 const float max_steer =0.75;
@@ -350,9 +363,9 @@ return sv+((float)RunProps.Speed_G*err);
    //zot
 void Steer()
 {
- static float ierr;
- static float last_heading;
-
+// static float ierr FAST_USER_VAR;
+ //static float last_heading FAST_USER_VAR;
+ uint32_t ts=sim2.timer[3].tcn;
 
  float head;
  if(RunProps.UseMag)
@@ -360,9 +373,9 @@ void Steer()
 	else
 	head=RawHeading;
 
- float cur_rot_dps=turn_angle(last_heading,head)*50; //Magicv 50 is RC frame rate 
+ //float cur_rot_dps=turn_angle(last_heading,head)*50; //Magicv 50 is RC frame rate 
 
- float rotv_error=(SegRotv-cur_rot_dps); //left is minus
+ //float rotv_error=(SegRotv-cur_rot_dps); //left is minus
 
 
  float err=(TargetHeading-head);
@@ -370,9 +383,9 @@ void Steer()
  if(err<-180) err+=360;
 
  float sv=(float)RunProps.SteerP*err+ 
-	      (float)RunProps.SteerI*ierr+
+	      //(float)RunProps.SteerI*ierr+
           ((float)RunProps.SteerD*(float)RotVel[2]/1000.0)
-		  +(float)RunProps.SteerVE*rotv_error
+		  //+(float)RunProps.SteerVE*rotv_error
 	      ;
 
 	      
@@ -381,28 +394,29 @@ void Steer()
 
  if(sv>max_steer) sv=max_steer;
  if(sv<min_steer) sv=min_steer;
- slo.rve=rotv_error;
+// slo.rve=rotv_error;
  slo.t=TargetHeading;
  slo.e=err;
 
  sv-=(float)RunProps.SteerZero;
  SetServoPos(0,-sv);
-
+/*
 if(bIsMoving())
 {
  slo.m=1;
- ierr+=err;
+// ierr+=err;
 }
 else
 {
  slo.m=0;
 }
-slo.i=ierr;
+*/
+//slo.i=ierr;
 slo.steer=-sv;
 slo.motor=last_motor;
+slo.dt=sim2.timer[3].tcn-ts;
 slo.Log();
-
-last_heading=head;
+//last_heading=head;
 }
 
 
@@ -439,10 +453,10 @@ float v;
 
 void NextPoint()
 {
-
 	if(RawPaths[CurPathIndex].end_speed!=0)	CurPathIndex++;
     else
-	{bStopHere=true;
+	{
+	 bStopHere=true;
 	 return;
 	}
 
@@ -461,6 +475,8 @@ void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
 	float ts;
 	float t_rotv;
 	float head=proj_head;
+	uint32_t tims=sim2.timer[3].tcn; 
+
  /*
 	float head;
 	if(RunProps.UseMag)
@@ -468,15 +484,18 @@ void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
 	   else
 	   head=RawHeading;
   */  
+	if(bStopHere) return;
+
 	if(RawPaths[CurPathIndex].NavCalc(proj_pt,proj_head,th,xtk,ts,t_rotv)) 
 	{
      NextPoint();
-	 if(!bStopHere) DoNewNavCalcs(proj_pt,proj_head);
-	 return;
+	 if(bStopHere) return;
+	 RawPaths[CurPathIndex].NavCalc(proj_pt,proj_head,th,xtk,ts,t_rotv);
 	}
     SegSpeed=ts;
 	SegRotv=t_rotv;
 
+	NavCalcObj.dt1=sim2.timer[3].tcn-tims; 
  
  float xh=0;
   xh=-xtk*(float)RunProps.CrossAngleScale;
@@ -519,7 +538,9 @@ void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
   NavCalcObj.th=th;
   NavCalcObj.x=CurPos.x;
   NavCalcObj.y=CurPos.y;
+  NavCalcObj.dt=sim2.timer[3].tcn-tims;
   NavCalcObj.Log();
+
 }
 
 
@@ -536,6 +557,7 @@ void ModeChange(int new_mode, int prev_mode)
  {
 	 CurPos=RawPaths[0].start_point;
      CurPathIndex=0;
+	 bStopHere=false;
 
   if(!RunProps.UseMag)
   {
@@ -565,23 +587,19 @@ volatile bool bRCFrameError;
 
 int LCD_SER;
 
+
 void LCD_DisplayTask(void * pd)
 {
 	uint32_t LastLidar=LidarScanCount;
 	uint32_t LastRCFrame=RCFrameCnt;
-	uint32_t Lsec=Secs;
 
 	while (1)
-   {//Main processing loop
+   {//LCD processing loop
 
+		OSTimeDly(20);
 
-	if(Lsec!=Secs)
 	{
-		Lsec=Secs;
-		bso.s=Secs;
-		bso.Log();
-
-		LCD_X_Y(LCD_SER,0,0);
+	    LCD_X_Y(LCD_SER,0,0);
 		if(bIMU_Id)
 		{if(Secs &1)
 			fdprintf(LCD_SER,"X%ld,%3.0f,%3.0f ",OdoCount,IntegratedHeading,MagHeading);
@@ -610,13 +628,10 @@ void LCD_DisplayTask(void * pd)
 //	  printf("L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
 //      printf("OdoCount %ld LIDAR_VALUE=%ld\r\n",OdoCount,LIDAR_VALUE);
 //      printf("AD [%04X,%04X,%04X,%04X]\r\n",GetADResult(0),GetADResult(1),GetADResult(2),GetADResult(3));
-      StartAD();
 
-	  Lsec=Secs;
 	  LastLidar=LidarScanCount;
 	  LastRCFrame=RCFrameCnt;
 	}
-	OSTimeDly(1);
   }
 }
 
@@ -628,7 +643,7 @@ void LCD_DisplayTask(void * pd)
 
 bool newRC()
 {
-static uint32_t LastRCFrameCnt;
+static uint32_t LastRCFrameCnt FAST_USER_VAR;
 uint32_t RC_In=RCFrameCnt;
 if(RC_In!=LastRCFrameCnt)
 {
@@ -640,7 +655,7 @@ return false;
 
 uint32_t newODO()
 {
-static uint32_t myLastODOCnt;
+static uint32_t myLastODOCnt FAST_USER_VAR;
 uint32_t ODO_In=OdoCount;
 if(ODO_In!=myLastODOCnt)
 {
@@ -654,7 +669,7 @@ return 0;
 
 bool newServoFrame()
 {
-static uint32_t lastServoFrameCnt;
+static uint32_t lastServoFrameCnt FAST_USER_VAR;
 uint32_t SF_In=ServoFrameCnt;
 if(SF_In!=lastServoFrameCnt)
 {
@@ -722,11 +737,14 @@ void UserMain(void * pd)
 		iprintf( "EnableMultiPartForms() initialization failed\r\n" );
 	}
 	RegisterPost();
+	LCD_SER=SimpleOpenSerial(5,9600);
+	LCD_CLS(LCD_SER);
+
 
 	iprintf("AVC  at  %s on %s\r\n",__TIME__,__DATE__);
-
+	fdprintf(LCD_SER,"Setting up Trig");
     uint32_t ttn=TimeTick;
-    SetUpTables();
+    SetUpTables((float)RunProps.ODODist);
     iprintf("Table init Took %ld ticks\r\n",TimeTick-ttn);
 
 	//Testnav();
@@ -751,9 +769,9 @@ void UserMain(void * pd)
    iprintf("Size of a single path_element is :%ld\r\n",sizeof(path_element));
 
 
-   LCD_SER=SimpleOpenSerial(5,9600);
    LCD_CLS(LCD_SER);
 
+   StartAD();
 
    SetPinIrq(49,-1,OdoIrq);
 
@@ -768,7 +786,7 @@ void UserMain(void * pd)
 
    InitTimer3();
    Mpu9250setup(MAIN_PRIO-2);
-   InitLidar(2,MAIN_PRIO-1);
+   InitLidar(2,MAIN_PRIO-1,MAIN_PRIO+2);
    InitLogFtp(MAIN_PRIO+1);
 
    ServoDriveInit();
@@ -821,18 +839,37 @@ void UserMain(void * pd)
    while(Lsec==Secs) asm("nop");
 
 
-   OSSimpleTaskCreatewName(LCD_DisplayTask,MAIN_PRIO+2,"LCD State");
+   OSSimpleTaskCreatewName(LCD_DisplayTask,MAIN_PRIO+3,"LCD State");
 
    pNotifyNextFrameSem=&MainTaskSem;
+
+   uint32_t nRc=0;
+   uint32_t nOdo=0;
+   uint32_t nSf=0;
 
 
   while(1)
   {
-	  MainTaskSem.Pend(2);
+    MainTaskSem.Pend(2);
+
+	
+   if(Lsec!=Secs)
+	   { Lsec=Secs;
+		bso.s=Secs;
+		bso.nRc=nRc;
+		bso.nOdo=nOdo;
+		bso.nSf=nSf;
+		bso.Log();
+		nRc=0;
+		nOdo=0;
+		nSf=0; 
+       }
+
 
 	if(newRC())
    {
-     static int LastActiveMode;
+	nRc++;
+     static int LastActiveMode FAST_USER_VAR;
 	
 	if(rc_ch[5]<700) nActiveMode=0;
      else if(rc_ch[5]<1200) nActiveMode=1;
@@ -845,11 +882,14 @@ void UserMain(void * pd)
 		
 		}
 		LastActiveMode =nActiveMode;
-    LogRC();
+   // LogRC();
    }
-   uint32_t delta_odo=newODO();
+   
+	uint32_t delta_odo=newODO();
    if(delta_odo)
    {
+	 nOdo++;
+	uint32_t ts=sim2.timer[3].tcn; 
 	   if(DtOdoCount==0)
 		calc_speed=0;
 		   else
@@ -857,69 +897,92 @@ void UserMain(void * pd)
 
 
 	 float head;
-	 static float last_head;
+	 static float last_head FAST_USER_VAR;
+	 static int Lidar_Skip FAST_USER_VAR; 
 
      if(RunProps.UseMag)
 		 head=IntegratedHeading;
 		 else
 		 head=RawHeading;
 
-		 float dist=(float)RunProps.ODODist;
-		 if(delta_odo!=1)
-		 {
-		  dist=(float)RunProps.ODODist*(float)delta_odo;
-		 }
-
+		 cpo.dt1=(sim2.timer[3].tcn-ts);
 
          //Can't average headings...s
+		 
 		 float usehead=avg_angle(head,last_head);
-		 float dx=dist*LookUpSinDeg(usehead);
-		 float dy=dist*LookUpCosDeg(usehead);
+		 unsigned long usehead_index=ConvertDegToIndex(usehead);  
+		 float dx;
+		 float dy;
+		 LookUpSinCosDistIndex(usehead_index,dx,dy);
+		 if(delta_odo!=1)
+		 {
+		  dy*=delta_odo;
+		  dx*=delta_odo;
+		 }
+		 
 		 last_head=head;
 		 CurPos.x+=dx;
      	 CurPos.y+=dy;
 		 cpo.x=CurPos.x;
 		 cpo.y=CurPos.y;
-		 uint32_t t1=sim2.timer[3].tcn;
+		 
 		 uint32_t tc=0;
 		 int32_t b=0;
-		 bLidarRight=false;
-         cpo.pc=LidarPointCount;
+		 uint32_t pc=0;
+
 		 //cpo.sn=ProcessLidarLines(b,tc);
+		 
+		 if(!LidarBusy()) 
+			 {
+			 cpo.sn=GetLidarResult(b,tc,pc);
+			 LidarSampleStart(eLeft);
+			 cpo.dt=Lidar_Skip;
+			 Lidar_Skip=0;
+			 }
+		    else
+			{
+			 Lidar_Skip++;
+			 cpo.dt=Lidar_Skip;
+			}
+
+		 cpo.pc=pc;
 		 cpo.tc=tc;
 		 cpo.b=b;
-		 uint32_t t2=sim2.timer[3].tcn;
-		 LidarPointCount=0;
-		 cpo.dt=(t2-t1);
-		 bLidarRight=true;
+
 
 		 //We want to project 200msec ahead...
 		 int ProjectDist=(25000000/DtOdoCount);
 		 fPoint ProjectPos=CurPos;
-		 float deltahead=turn_angle(last_head,head);
+		 unsigned long deltahead_index=ConvertDegToIndex(turn_angle(last_head,head));
+		 
+		 cpo.dt2=(sim2.timer[3].tcn-ts);
 
 		 for(int i=0; i<ProjectDist; i++)
 		 {
-		  usehead+=deltahead;
-		  dx=dist*LookUpSinDeg(usehead);
-		  dy=dist*LookUpCosDeg(usehead);
+		  usehead_index+=deltahead_index;
+		  LookUpSinCosDistIndex(usehead_index,dx,dy); 
           ProjectPos.x+=dx;
           ProjectPos.y+=dy;
 		 }
-
+		 cpo.nproj=ProjectDist;
 		 cpo.px=ProjectPos.x;
 		 cpo.py=ProjectPos.y;
+		 
+		 cpo.dt3=(sim2.timer[3].tcn-ts);
 
 		 if(nActiveMode!=0)
 			 { 
 			  DoNewNavCalcs(ProjectPos,usehead);
 			 };
+        
+		cpo.dto=(sim2.timer[3].tcn-ts);
+		cpo.Log();
 
-        cpo.Log();
    }
 
    if(newServoFrame())
    {
+	  nSf++;
 	   switch (nActiveMode)
 	   {
 	   case 0:
@@ -966,90 +1029,7 @@ void UserMain(void * pd)
 
 }
 
-uint32_t LineSlopeCount[256];
-long long  BSum[256];
 
-
-uint32_t ProcessLidarLines(int32_t & b,uint32_t &tc)
-{
-uint32_t n=LidarPointCount;
-if(n>256) n=256;
-uint32_t total_counted=0;
-
-if(n<10) //Need at least 10 points
-{
- tc=0;
- return 0;
-}
-
-bzero(LineSlopeCount,256*sizeof(uint32_t));
-bzero(BSum,256*sizeof(BSum[0]));
-for (uint32_t i=0; i<(n-1); i++)
-	for( uint32_t j=i+1; j<n; j++)
-	{
-	 int dx=LidarPointSet[i].x-LidarPointSet[j].x;
-	 int dy=LidarPointSet[i].y-LidarPointSet[j].y;
-	 if(dy!=0)
-	 { //dx is left right
-	   //dy fore aft
-       //dx/dy = slope only care about -1 to +1
-	   //Or +/- 45 degrees    scaled to 0 to 256
-	   //  x=my+b
-	   //X1=my1+b
-	   //m=dx/dy
-	   //X1=dxy1/dy +b
-	   //B=X1-(DX*Y1/Dy)
-	
-	  int slope=(dx*128)/dy;  //+1==128 -1==-128
-	
-	  if((slope>=-128) && (slope<=127))
-	   {
-         LineSlopeCount[slope+128]++;
-		 //B=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy);
-		 BSum[slope+128]+=LidarPointSet[i].x-((dx*LidarPointSet[i].y)/dy);
-		 total_counted++;
-	   }
-	 }
-	}
-if(total_counted>5)
-{
- tc=total_counted;
-//Now find Median value
-
- n=0;
- total_counted/=2;
-
-for(int i=0; i<256; i++)
-{
- n+=LineSlopeCount[i];
-
- if(n>=(total_counted))
-  {
-	if(i>1)
-	{
-	 //Find the greatest i-1,i,i+1
-	 if(LineSlopeCount[i-1]>LineSlopeCount[i+1])
-	 {
-		 if(LineSlopeCount[i-1]>LineSlopeCount[i])
-		 i--;
-	 }
-	 else
-	 {
-		 if(LineSlopeCount[i+1]>LineSlopeCount[i])
-			 i++;
-	 }
-	}
-	if(LineSlopeCount[i]!=0)
-	{
-     b=BSum[i]/LineSlopeCount[i];
-    return i;
-	}
-	return 256;
-  }
-}
-}
-return 256;
-}
 
 
 

@@ -41,12 +41,12 @@ volatile bool bLog;
 uint8_t LogData[LOG_SIZE];
 
 
-uint32_t LogGet;
-uint32_t LogPut;
+uint32_t LogGet FAST_USER_VAR;
+uint32_t LogPut FAST_USER_VAR;
 bool bOverFlow;
 
 
-OS_CRIT LogCrit;
+OS_CRIT LogCrit FAST_USER_VAR;
 
 struct IntroSpecDescription
 {

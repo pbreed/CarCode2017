@@ -7,11 +7,12 @@ LOGFILEINFO;
 
 const float pi=3.14159265358979323846;
 
+float DistSinQuadTable[65536];
 float SinQuadTable[65536];
 float AX128ToSinCosInIn[46080][2];
 
 
-void SetUpTables()
+void SetUpTables(float dist)
 {
 iprintf("Starting to setup tables\n");
  
@@ -21,6 +22,7 @@ for(int i=0; i<65536; i++)
     d*=pi;
     d/=131072.0;
     SinQuadTable[i]=sin(d);
+	DistSinQuadTable[i]=dist*sin(d);
  }
 
  iprintf("Workign on table 2\r\n");
@@ -67,6 +69,21 @@ return 0; //We should never get here...
 }
 
 
+float CoreDistSinLookup(unsigned long index)
+{
+index &=(0X3FFFF); //tRUNCATE TO 0 TO 2PI, DOES THE RIGHT THING WITH RESPECT TO WRAP AROUND
+	switch(index & 0x30000)
+	{
+	case 0x00000: return DistSinQuadTable[index];  //0 to 90 degrees...
+	case 0x10000: return DistSinQuadTable[0x1FFFF-index];//90 to 180 degrees...
+	case 0x20000: return -DistSinQuadTable[index & 0xFFFF];//180 to 270 degrees...
+	case 0x30000: return -DistSinQuadTable[0x1FFFF-(index &0x1FFFF)];//270 to 360 degrees...
+	}
+return 0; //We should never get here...
+}
+
+
+
 
 float LookUpSinRad(float rads)
 {
@@ -104,6 +121,21 @@ unsigned long index=(deg*131072.0/180.0);
 index+=0x10000;//Cos is just sin(x+90)
 return CoreSinLookup(index);
 }
+
+
+void LookUpSinCosDistIndex(unsigned long index ,float & s ,float & c)
+{
+s=CoreDistSinLookup(index);
+c=CoreDistSinLookup(index+0x10000);
+}
+
+unsigned long ConvertDegToIndex(float deg)
+{
+return (deg*131072.0/180.0); 
+}
+
+
+
 
 float inv_sqrt( float number )
 {

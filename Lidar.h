@@ -4,7 +4,15 @@ extern volatile uint32_t ssUResult[360];
 extern volatile uint32_t LidarScanCount;
 extern volatile uint32_t LidarRxc;
 
-void InitLidar(int port,int TaskPrio);
+void InitLidar(int port,int TaskPrio, int CalcTaskPrio);
+
+enum LidarWallMode {eOff, eRight,eLeft, eCalculating, eDoneLeft, eDoneRight};
+
+
+bool LidarBusy();
+int GetLidarResult(int32_t & b,uint32_t &tc, uint32_t &pc);
+void LidarSampleStart(LidarWallMode mode);
+
 
 
 struct IntPoint
