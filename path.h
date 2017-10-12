@@ -119,6 +119,9 @@ struct raw_path
  LidarWallMode  m_eWall;
  float wall_dist; //+ to right, - to left 
 
+ int m_CornerSign; //-1 is drop away +1 is jump in 0 is no corner
+ fPoint Corner_pos;
+
  //Line stuff
  float line_dx;        
  float line_dy;        

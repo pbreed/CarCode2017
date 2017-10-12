@@ -28,7 +28,6 @@ uint32_element lidar{"lidar"};
 uint32_element lidmin{"lmin"};
 uint32_element odo{"Odo"};
 uint32_element dtodo{"DtOdo"};
-int32_element  corner{"corner"};
 END_INTRO_OBJ;
 
 
@@ -69,17 +68,8 @@ CompassCal():config_obj(appdata,"CompassCal") {};
 };
 
 
-class LidarCornerParams:public config_obj
-{
-public:
-LidarCornerParams():config_obj(appdata,"LidarCorner") {};
-    config_int det_diff{400000,"diff"};
-	ConfigEndMarker;
-};
-
 
 CompassCal compass_cal;
-LidarCornerParams lidar_corner;
 
 
 volatile bool bCompassCalDirty;
@@ -780,8 +770,6 @@ void ProcessNewImuData();
 void IMUSampleTask(void *p)
 {
 int16_t dest[8];
-static uint32_t PrevOdo;
-static uint32_t PLidarArray[5];
 
 
 while(1)
@@ -808,33 +796,8 @@ while(1)
 	 ImuR.odo=OdoCount;
 	 ImuR.dtodo=DtOdoCount;
      ImuR.head=IntegratedHeading;
-	 ImuR.corner=0;
 	 ImuR.rhead=RawHeading;
 	 ImuR.axsum=AAxisSum[0];
-
-	 if(PrevOdo!=OdoCount)
-	 {
-		 PLidarArray[4]=PLidarArray[3] ;
-		 PLidarArray[3]=PLidarArray[2] ;
-		 PLidarArray[2]=PLidarArray[1] ;
-		 PLidarArray[1]=PLidarArray[0] ;
-         PLidarArray[0]=LIDAR_VALUE;
-
-		 uint32_t a1=(PLidarArray[3]+PLidarArray[4])/2;
-		 uint32_t a0=(PLidarArray[1]+PLidarArray[0])/2;
-
-		 if (a1>(a0+lidar_corner.det_diff))
-		 {
-		  if((PLidarArray[4]>a0) && (PLidarArray[3]>a0))
-		       ImuR.corner=1;//From open to corner toward me
-		 }
-		 else
-	    if(a0>(a1+lidar_corner.det_diff))
-	    {
-			if((PLidarArray[4]<a0) && (PLidarArray[3]<a0))
-			ImuR.corner=-1; //from wall to open corner
-	    }
-	 }
 
 	 ImuR.Log();
 

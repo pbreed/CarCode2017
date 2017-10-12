@@ -71,6 +71,15 @@ float SegSpeed;
 bool bStopHere;
 float SegRotv;
 
+class LidarCornerParams:public config_obj
+{
+public:
+LidarCornerParams():config_obj(appdata,"LidarCorner") {};
+    config_int det_diff{400000,"diff"};
+	ConfigEndMarker;
+};
+LidarCornerParams lidar_corner;
+
 
 
 
@@ -474,6 +483,11 @@ void NextPoint()
     NextPointObj.cp=RawPaths[CurPathIndex].ref_path_num;
 	NextPointObj.Log();
 
+}
+
+
+void ProcessCorner(int sign, int counts)
+{
 }
 
 float DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
@@ -897,6 +911,32 @@ void UserMain(void * pd)
 	uint32_t delta_odo=newODO();
    if(delta_odo)
    {
+	   static  uint32_t PLidarArray[5] FAST_USER_VAR; ;
+
+	   PLidarArray[4]=PLidarArray[3] ;
+	   PLidarArray[3]=PLidarArray[2] ;
+	   PLidarArray[2]=PLidarArray[1] ;
+	   PLidarArray[1]=PLidarArray[0] ;
+	   PLidarArray[0]=LIDAR_VALUE;
+
+	   uint32_t a1=(PLidarArray[3]+PLidarArray[4])/2;
+	   uint32_t a0=(PLidarArray[1]+PLidarArray[0])/2;
+
+	   if (a1>(a0+lidar_corner.det_diff))
+	   {
+		if((PLidarArray[4]>a0) && (PLidarArray[3]>a0))
+			{
+			ProcessCorner(-1,a0);
+			}//From Open Corner to toward me
+	   }
+	   else
+	  if(a0>(a1+lidar_corner.det_diff))
+	  {
+		  if((PLidarArray[4]<a0) && (PLidarArray[3]<a0))
+			  ProcessCorner(+1,a1);
+	  }
+
+
 	 nOdo++;
 	uint32_t ts=sim2.timer[3].tcn; 
 	   if(DtOdoCount==0)

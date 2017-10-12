@@ -895,6 +895,25 @@ else
 {
  m_eWall=eOff; 
 }
+
+if(PathArray[ref_path_num].m_bDoCorner)
+{
+if(PathArray[ref_path_num].m_bCorner_Indent)
+ {
+   m_CornerSign=1;
+ }
+else
+{
+	m_CornerSign=-1;
+}
+Corner_pos.x=PathArray[ref_path_num].m_CornerAct_X;
+Corner_pos.y=PathArray[ref_path_num].m_CornerAct_Y;
+}
+else
+{
+ m_CornerSign=0; //-1 is drop away +1 is jump in 0 is no corner
+}
+
 line_dx=end_point.x-start_point.x;
 line_dy=end_point.y-start_point.y;
 targ_rotv=0;
@@ -1002,16 +1021,24 @@ void raw_path::RenderTable(int fd )
 	fdprintf(fd,"<TR><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%d</TD><TD>%s</TD>",
 				start_point.x, start_point.y, end_point.x,end_point.y,total_dist,start_head,end_head,radius,start_speed ,end_speed,ref_path_num,GetLidarStateName(m_eWall));
 	if(!bArc)
-		fdprintf(fd,"<TD></TD></TR>\r\n");
+		fdprintf(fd,"<TD></TD>");
 	else
 	if(bLeftTurn) 
-		fdprintf(fd,"<TD>Left</TD></TR>\r\n");
+		fdprintf(fd,"<TD>Left</TD>");
 	else
-		fdprintf(fd,"<TD>Right</TD></TR>\r\n");
+		fdprintf(fd,"<TD>Right</TD>");
+  if(m_CornerSign!=0)
+  {
+	  fdprintf(fd,"<TD>%d:[%g:%g]</TD></TR>\r\n",m_CornerSign,Corner_pos.x,Corner_pos.y);
+  }
+  else
+	fdprintf(fd,"<TD></TD></TR>\r\n");
+
+
 
 }
 void raw_path::RenderTableHead(int fd)
 {
-   fdprintf(fd,"<TR><TH>Sx</TH><TH>Sy</TH><TH>Ex</TH><TH>Ey</TH><TH>Dist</TH><TH>Sh</TH><TH>Eh</TH><TH>Rad</TH><TH>Spd st</TH><TH>Spd end</TH><TH>#</TH><TH>LidarMode</TH><TH>L/R</TH></TR>\r\n");
+   fdprintf(fd,"<TR><TH>Sx</TH><TH>Sy</TH><TH>Ex</TH><TH>Ey</TH><TH>Dist</TH><TH>Sh</TH><TH>Eh</TH><TH>Rad</TH><TH>Spd st</TH><TH>Spd end</TH><TH>#</TH><TH>LidarMode</TH><TH>L/R</TH><TH>Corn</TH></TR>\r\n");
 }
 
