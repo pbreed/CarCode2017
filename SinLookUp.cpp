@@ -129,6 +129,12 @@ s=CoreDistSinLookup(index);
 c=CoreDistSinLookup(index+0x10000);
 }
 
+void LookUpSinCosIndex(unsigned long index ,float & s ,float & c)
+{
+s=CoreSinLookup(index);
+c=CoreSinLookup(index+0x10000);
+}
+
 unsigned long ConvertDegToIndex(float deg)
 {
 return (deg*131072.0/180.0); 

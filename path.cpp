@@ -1,3 +1,4 @@
+
 #include <http.h>
 #include <stdio.h>
 #include <utils.h>
@@ -12,9 +13,11 @@
 #include <config_obj.h>
 #include "SinLookup.h"
 #include "nav.h"
-#include "path.h"
 #include "introspec.h"
 #include "runprop.h"
+#include "Lidar.h"
+#include "path.h"
+
 LOGFILEINFO;
 
 path_element PathArray[1000];
@@ -99,7 +102,7 @@ int MyDoGet( int sock, char *  url, char *  rxBuffer )
 
 int ShowCurPath(int sock, const char* pUrl)
 {
-  fdprintf(sock,"<TABLE border=\"1\"><TR><TH>#</TH><TH>X</TH><TH>Y</TH><TH>Head</TH><TH>Speed</TH><TH>Next</TH><TH>Arc</TH><TH>ArcR</TH><TH>Chord</TH><TH>Right/Left</TH></TR>\r\n");
+  fdprintf(sock,"<TABLE border=\"1\"><TR><TH>#</TH><TH>X</TH><TH>Y</TH><TH>Head</TH><TH>Speed</TH><TH>Next</TH><TH>Edge</TH><TH>Arc</TH><TH>ArcR</TH><TH>Chord</TH><TH>Right/Left</TH></TR>\r\n");
   int i=0;
   while(PathArray[i].m_bValid)
   {
@@ -123,6 +126,10 @@ int ShowCurPath(int sock, const char* pUrl)
 		  fdprintf(sock,"<TD></TD>");
 	  }
 
+	  if(PathArray[i].m_bDoEdge)
+		  fdprintf(sock,"<TD>%g</TD>",PathArray[i].m_edge_dist);
+	  else
+		  fdprintf(sock,"<TD>..</TD>");
 	  if(PathArray[i].m_bArc)
 	  {
 
@@ -283,9 +290,9 @@ if (*cp)
 		 while (diff>180) diff-=360;
 		 while (diff<-180) diff+=360;
 		 if(diff<0)
-			 PathArray[n].m_edge_dist=dist; //+ to right, - to left
-		 else
 			 PathArray[n].m_edge_dist=-dist; //+ to right, - to left
+		 else
+			 PathArray[n].m_edge_dist=dist; //+ to right, - to left
 		}
 		
 		if((PathArray[n].m_bDoCorner)&& (n>0))
@@ -868,6 +875,7 @@ void raw_path::CalcLineStuff()
 if(bArc)
 {
  //Given speed and radius we want rotvel in deg/sec
+m_eWall=eOff;
 float circ=radius*2.0*PI;
 float ips=start_speed*5280*12/3600.0; //mph ->ips
 targ_rotv=360*ips/circ;
@@ -875,6 +883,18 @@ if(bLeftTurn) targ_rotv=-targ_rotv;
 }
 else
 {
+if(PathArray[ref_path_num].m_bDoEdge)
+{
+  if(PathArray[ref_path_num].m_edge_dist>0) //+ to right, - to left 
+		 m_eWall=eRight;  
+  else
+	     m_eWall=eLeft;  
+  wall_dist=PathArray[ref_path_num].m_edge_dist;
+}
+else
+{
+ m_eWall=eOff; 
+}
 line_dx=end_point.x-start_point.x;
 line_dy=end_point.y-start_point.y;
 targ_rotv=0;
@@ -964,6 +984,8 @@ bool raw_path::ArcCalc(fPoint pos,float cur_head,float &best_head,float &xtk, fl
 }
 
 
+const char * GetLidarStateName(LidarWallMode lm);
+
 //Returns true if time to to do next point
 //xtk is -left + right
 bool raw_path::NavCalc(fPoint pos,float cur_head,float &best_head,float &xtk, float &targ_speed,float & t_rotv)
@@ -977,8 +999,8 @@ if (bArc)
 
 void raw_path::RenderTable(int fd )
 {
-	fdprintf(fd,"<TR><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%d</TD>",
-				start_point.x, start_point.y, end_point.x,end_point.y,total_dist,start_head,end_head,radius,start_speed ,end_speed,ref_path_num);
+	fdprintf(fd,"<TR><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%d</TD><TD>%s</TD>",
+				start_point.x, start_point.y, end_point.x,end_point.y,total_dist,start_head,end_head,radius,start_speed ,end_speed,ref_path_num,GetLidarStateName(m_eWall));
 	if(!bArc)
 		fdprintf(fd,"<TD></TD></TR>\r\n");
 	else
@@ -990,6 +1012,6 @@ void raw_path::RenderTable(int fd )
 }
 void raw_path::RenderTableHead(int fd)
 {
-   fdprintf(fd,"<TR><TH>Sx</TH><TH>Sy</TH><TH>Ex</TH><TH>Ey</TH><TH>Dist</TH><TH>Sh</TH><TH>Eh</TH><TH>Rad</TH><TH>Spd st</TH><TH>Spd end</TH><TH>#</TH><TH>L/R</TH></TR>\r\n");
+   fdprintf(fd,"<TR><TH>Sx</TH><TH>Sy</TH><TH>Ex</TH><TH>Ey</TH><TH>Dist</TH><TH>Sh</TH><TH>Eh</TH><TH>Rad</TH><TH>Spd st</TH><TH>Spd end</TH><TH>#</TH><TH>LidarMode</TH><TH>L/R</TH></TR>\r\n");
 }
 

@@ -116,6 +116,9 @@ struct raw_path
  float targ_rotv;  //in deg/per sec - is left + is right
 
 
+ LidarWallMode  m_eWall;
+ float wall_dist; //+ to right, - to left 
+
  //Line stuff
  float line_dx;        
  float line_dy;        

@@ -314,6 +314,14 @@ int32_element rp{"rp"};
 int32_element cp{"cp"};
 END_INTRO_OBJ;
 
+START_INTRO_OBJ(LidarCorrectObj,"LidarCorr")
+float_element dx{"dx"};
+float_element dy{"dy"};
+float_element hCor{"HCor"};
+float_element b4{"b4"};
+float_element aft{"aft"};
+float_element th{"th"};
+END_INTRO_OBJ;
 
 
 
@@ -336,6 +344,8 @@ static ModeChangeObj mco FAST_USER_VAR;
 static SteerLoopObj slo FAST_USER_VAR;
 static BootSecObj   bso FAST_USER_VAR;
 static CurPosObj    cpo FAST_USER_VAR;
+static LidarCorrectObj lco FAST_USER_VAR;
+
 
 static fPoint  CurPos FAST_USER_VAR;
 
@@ -466,9 +476,8 @@ void NextPoint()
 
 }
 
-void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
+float DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
 {
-//	zot      
 
 	float th;
 	float xtk;
@@ -484,12 +493,12 @@ void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
 	   else
 	   head=RawHeading;
   */  
-	if(bStopHere) return;
+	if(bStopHere) return 0;
 
 	if(RawPaths[CurPathIndex].NavCalc(proj_pt,proj_head,th,xtk,ts,t_rotv)) 
 	{
      NextPoint();
-	 if(bStopHere) return;
+	 if(bStopHere) return 0;
 	 RawPaths[CurPathIndex].NavCalc(proj_pt,proj_head,th,xtk,ts,t_rotv);
 	}
     SegSpeed=ts;
@@ -540,7 +549,7 @@ void DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
   NavCalcObj.y=CurPos.y;
   NavCalcObj.dt=sim2.timer[3].tcn-tims;
   NavCalcObj.Log();
-
+  return xtk;
 }
 
 
@@ -899,7 +908,7 @@ void UserMain(void * pd)
 	 float head;
 	 static float last_head FAST_USER_VAR;
 	 static int Lidar_Skip FAST_USER_VAR; 
-
+	 static int try_lidar_again;
      if(RunProps.UseMag)
 		 head=IntegratedHeading;
 		 else
@@ -932,30 +941,16 @@ void UserMain(void * pd)
 
 		 //cpo.sn=ProcessLidarLines(b,tc);
 		 
-		 if(!LidarBusy()) 
-			 {
-			 cpo.sn=GetLidarResult(b,tc,pc);
-			 LidarSampleStart(eLeft);
-			 cpo.dt=Lidar_Skip;
-			 Lidar_Skip=0;
-			 }
-		    else
-			{
-			 Lidar_Skip++;
-			 cpo.dt=Lidar_Skip;
-			}
 
-		 cpo.pc=pc;
-		 cpo.tc=tc;
-		 cpo.b=b;
-
-
+		 
 		 //We want to project 200msec ahead...
 		 int ProjectDist=(25000000/DtOdoCount);
 		 fPoint ProjectPos=CurPos;
 		 unsigned long deltahead_index=ConvertDegToIndex(turn_angle(last_head,head));
 		 
 		 cpo.dt2=(sim2.timer[3].tcn-ts);
+
+		 unsigned long was_head_index=usehead_index;
 
 		 for(int i=0; i<ProjectDist; i++)
 		 {
@@ -972,11 +967,127 @@ void UserMain(void * pd)
 
 		 if(nActiveMode!=0)
 			 { 
-			  DoNewNavCalcs(ProjectPos,usehead);
-			 };
+			 //Save XTK for Laser corrections...
+			  float xtk=DoNewNavCalcs(ProjectPos,usehead);
+			  
+			 if(!LidarBusy()) 
+			 {
+			  int SlopeNum=GetLidarResult(b,tc,pc);
+			  cpo.sn=SlopeNum;
+			  LidarSampleStart(RawPaths[CurPathIndex].m_eWall);
+			  cpo.dt=Lidar_Skip;
+			  Lidar_Skip=0;
+			  
+			  cpo.pc=pc;
+		      cpo.tc=tc;
+		      cpo.b=b;
+
+			  //Right LIDAR
+			  //<128 is car pointed to wall
+			  //128 is straight
+			  //>128 car pointed away
+
+			  //Left Lidar
+			  //<128 Car is pointed away from wall
+			  //>128 Car is pointed at wall
+			  
+			  //So to fix heading 
+			  //<128 actual heading is more than correct so cor-
+			  //>128 actual heading is less than correct so cor+
+
+			  if(
+				 (tc>5) && 
+				 (pc>19) && 
+				 (SlopeNum!=0) && 
+				 (SlopeNum!=256)&&
+				 (RawPaths[CurPathIndex].m_eWall!=eOff)&&
+				 (try_lidar_again==0)
+			    )
+			  {//Do Lidar NAV Correction...
+				float DegCor=SlopeNumToDeg(SlopeNum);
+				//Segment heading
+				//Measured Wall heading
+				float WallHead=RawPaths[CurPathIndex].start_head;
+				
+				WallHead-=DegCor;
+				if(WallHead<(-180)) WallHead+=360;
+				else
+				if(WallHead>180) WallHead-=360;
+
+                lco.b4=RawHeading;
+                SetRawHeading(WallHead);
+				lco.aft=RawHeading;
+				lco.th=RawPaths[CurPathIndex].start_head;
+				
+				//Now for B...dist
+				//Both numbers + for to right - for to left
+				b=b-RawPaths[CurPathIndex].wall_dist;
+				//b=-100 dist -98  ->-2 we are 2" to far from left 	move left
+				//b=-98  dist -100 -> +2 we are 2" to close to left	move right
+               
+				//b= 100 dist 98  -> +2 we are 2" to far from right	   ->move right
+				//b= 98  dist 100 -> -2 we are 2" to close to the right ->move left
+
+				//so b is positive if we need to move right to get on track
+				//So coordiantes should be adjusted so that afterwards we are father left.
+				
+				//xtk is positive if we are too far right  neg too left
+                
+				//If b says we are too far left  b+2  xtk=+2 actuall error 0
+				b-=xtk;
+
+				//Now B has actual Lidar left/right error...
+				//+ if we are left of track so actual coordinates 
+				//are too far right
+
+
+                //We have was_head_index from above
+				LookUpSinCosIndex(was_head_index,dx,dy);
+
+				//Course dy=1 dx=0 N  b+  x-=(dy*b)  
+				//course dy=0 dx=1 E  b+  y+=(dx*b)
+                //course dy=1 dx=1 NE     x-=(dy*b) y+=(dx*b)
+
+				lco.dx=-b*dy;
+                lco.dy=b*dx;
+				lco.hCor=DegCor;
+				lco.Log();
+				CurPos.x+=-b*dy;
+                CurPos.y+=b*dx;
+				try_lidar_again=20;
+			  }
+
+			 }
+		    else
+			{
+			 Lidar_Skip++;
+			 cpo.dt=Lidar_Skip;
+			}
+
+		    }
+		 else
+		 {
+			 if(!LidarBusy()) 
+			  {
+			  cpo.sn=GetLidarResult(b,tc,pc);
+			   LidarSampleStart(eLeft);
+			   cpo.dt=Lidar_Skip;
+			   Lidar_Skip=0;
+			   cpo.pc=pc;
+			   cpo.b=b;
+			  }
+			  else
+			  {
+				  cpo.dt=0;
+				  cpo.pc=0;
+				  cpo.tc=0;
+				  cpo.b=0;
+			  }
+		 }
         
 		cpo.dto=(sim2.timer[3].tcn-ts);
 		cpo.Log();
+	   if(try_lidar_again) try_lidar_again--;
 
    }
 
