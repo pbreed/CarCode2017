@@ -62,7 +62,7 @@ void InitSingleEndAD()
 void StartAD()
 {
    sim2.adc.sr = 0xffff;   // Clear status codes
-   sim2.adc.cr1 |= 0x2000; // Starting ADC
+   sim2.adc.cr1 |= 0x2002; // Starting ADC
 }
 
 bool ADDone()

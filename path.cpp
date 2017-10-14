@@ -512,7 +512,7 @@ return false;
 void ReadString(const char* &cp, char * dest, int maxlen )
 {
 	trimlead(cp);
-	iprintf("Read string [%c%c%c%c]\r\n",cp[0],cp[1],cp[2],cp[3],cp[4]);
+	//iprintf("Read string [%c%c%c%c%c]\r\n",cp[0],cp[1],cp[2],cp[3],cp[4]);
 	if((*cp=='"')|| (*cp=='\''))
 	{
 		char cpd=*cp;
@@ -531,7 +531,7 @@ void ReadString(const char* &cp, char * dest, int maxlen )
 		   cp++;
 	}
 	if(maxlen) *dest=0;
-	iprintf("Result[%s]\r\n",dest);
+	//iprintf("Result[%s]\r\n",dest);
 
 	trimlead(cp);
 }
@@ -912,6 +912,9 @@ case 'b':
 case 'B':m_mode=eBar; break;
 case 'p':
 case 'P':m_mode = ePed; break;
+case 'h':
+case 'H':m_mode = eHoop; break;
+
 default:
 	  m_mode=eNormal;
 }
@@ -1044,6 +1047,7 @@ switch(nm)
 case eNormal: return "Norm";
 case eBar: return "Bar";
 case ePed: return "Ped";
+case eHoop: return "Hoop";
 default:return "???";
 }
 return "???";

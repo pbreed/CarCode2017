@@ -23,7 +23,7 @@ Options=null;	//null ped bar ramp
 Speed=null or mph
 */
 
-enum NavOpMode {eNormal,eBar, ePed};
+enum NavOpMode {eNormal,eBar, ePed,eHoop};
 
 
 
@@ -127,6 +127,7 @@ struct raw_path
 
  int m_CornerSign; //-1 is drop away +1 is jump in 0 is no corner
  fPoint Corner_pos;
+ bool CornerSatisfied;
 
  //Line stuff
  float line_dx;        

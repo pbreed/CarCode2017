@@ -17,6 +17,5 @@ float turn_angle(float cur_a, float next_a);
 
 
 
-
-
+fPoint AvgPoint(fPoint & p1, fPoint& p2);
 

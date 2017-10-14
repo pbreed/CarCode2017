@@ -77,7 +77,7 @@ class LidarCornerParams:public config_obj
 {
 public:
 LidarCornerParams():config_obj(appdata,"LidarCorner") {};
-    config_int det_diff{400000,"diff"};
+    config_int det_diff{400000,"diff"}; //Lidar counts are 1250/cm so ~125in
 	ConfigEndMarker;
 };
 LidarCornerParams lidar_corner;
@@ -322,6 +322,14 @@ int32_element b{"b"};
 END_INTRO_OBJ;
 
 
+START_INTRO_OBJ(CornerRec,"CornerRc")
+int32_element s{"s"};
+uint32_element lc{"lc"};
+float_element  x{"x"};
+float_element  y{"y"};
+int32_element  h{"h"};
+END_INTRO_OBJ;
+
 
 START_INTRO_OBJ(NextPointRec,"NextPt")
 int32_element rp{"rp"};
@@ -360,6 +368,7 @@ static SteerLoopObj slo FAST_USER_VAR;
 static BootSecObj   bso FAST_USER_VAR;
 static CurPosObj    cpo FAST_USER_VAR;
 static LidarCorrectObj lco FAST_USER_VAR;
+static CornerRec corn FAST_USER_VAR;
 
 
 static fPoint  CurPos FAST_USER_VAR;
@@ -462,6 +471,23 @@ void ProcessNewImuData()
 
 
 
+fPoint AvgPoint(fPoint & p1, fPoint& p2)
+{
+	fPoint pr;
+	pr.x=(p1.x+p2.x)/2;
+	pr.y=(p1.y+p2.y)/2;
+	return pr;
+}
+
+int32_t AvgHIndex(int32_t h1,int32_t h2)
+{
+  int32_t v=(h1+h2)/2;
+  if (((h1-h2)>131072)||((h2-h1)>131072))
+	   {v-=131072;}
+  v=v&0x3FFFF;
+  return v;
+}
+
 
 
 float avg_angle(float a1, float a2)
@@ -486,9 +512,10 @@ void NextPoint()
     else
 	{
 	 bStopHere=true;
+	 if(RunProps.StopOnRcLoss==false) bLog=false;
 	 return;
 	}
-
+	 RawPaths[CurPathIndex].CornerSatisfied=false;
     NextPointObj.rp=CurPathIndex;
     NextPointObj.cp=RawPaths[CurPathIndex].ref_path_num;
 	NextPointObj.Log();
@@ -496,8 +523,14 @@ void NextPoint()
 }
 
 
-void ProcessCorner(int sign, int counts)
+void ProcessCorner(int sign, uint32_t counts,fPoint p_at_det,int32_t head_index)
 {
+   corn.s=sign;
+   corn.lc=counts;
+   corn.x=p_at_det.x;
+   corn.y=p_at_det.y;
+   corn.h=head_index;
+   corn.Log();
 }
 
 
@@ -624,6 +657,8 @@ void ModeChange(int new_mode, int prev_mode)
  if((prev_mode==0) && (new_mode!=0))
  {
 	 CurPos=RawPaths[0].start_point;
+	 //CurPos.y-=70;
+
      CurPathIndex=0;
 	 bStopHere=false;
 	 tPedStop=0;
@@ -915,8 +950,6 @@ void UserMain(void * pd)
 
    LCD_CLS(LCD_SER);
 
-   StartAD();
-
    SetPinIrq(49,-1,OdoIrq);
 
 
@@ -945,6 +978,11 @@ void UserMain(void * pd)
    RCCallBack=ProcessNewRCPos;
 
     InitSingleEndAD();
+	StartAD();
+
+
+
+
 
     ImuMode=eCalibrating;
     OSTimeDly(TICKS_PER_SECOND);
@@ -989,16 +1027,57 @@ void UserMain(void * pd)
    while(Lsec==Secs) asm("nop");
 
 
-   OSSimpleTaskCreatewName(LCD_DisplayTask,MAIN_PRIO+3,"LCD State");
-
 
    pNotifyNextFrameSem=&MainTaskSem;
 
    uint32_t nRc=0;
    uint32_t nOdo=0;
    uint32_t nSf=0;
+   
+   if(RunProps.StopOnRcLoss==false)
+   {
+	 //ZOT
+
+   	 LCD_X_Y(LCD_SER,0,0);
+	 fdprintf(LCD_SER,"Release Button");
+	 int cnt=0;
+	 int adr=500;  
+	   while(cnt<5)
+	   {
+		   StartAD();
+		   while(!ADDone()) MainTaskSem.Pend(1);
+		   adr=GetADResult(0);
+		   if(adr>500) cnt++;
+		   else cnt=0;
+	   }
+	   LCD_CLS(LCD_SER);
+	   LCD_X_Y(LCD_SER,0,0);
+       fdprintf(LCD_SER,"Armed");
+
+	   cnt=0;
+	   while(cnt<5)
+	   {
+		   StartAD();
+		   while(!ADDone()) MainTaskSem.Pend(1); 
+		   adr=GetADResult(0);
+		   if(adr<500) cnt++;
+		   else cnt=0;
+	   }
+	   LCD_CLS(LCD_SER);
+       fdprintf(LCD_SER,"Go");
+
+	  iprintf("Starting!\r\n");
+	  bLog=true;
+	  nActiveMode=2;
+	  ModeChange(2,0);
 
 
+   }
+   else
+   OSSimpleTaskCreatewName(LCD_DisplayTask,MAIN_PRIO+3,"LCD State");
+
+
+/*************************While the world turns ****************************/
   while(1)
   {
     MainTaskSem.Pend(2);
@@ -1022,7 +1101,7 @@ void UserMain(void * pd)
 		nSf=0; 
        }
 
-
+/*************************Process new RC info *******************/
 	if(newRC())
    {
 	nRc++;
@@ -1042,41 +1121,22 @@ void UserMain(void * pd)
    // LogRC();
    }
    
+
+
+/*************************If stopped for Lidar recover *******************/
+
 	if((bLidarStop==true) && (LidarScanCount!=LastLidarScanCount))
 		{
 		 bLidarStop=false;
 		 DoNewNavCalcs(CurPos,RawHeading);
 	    }
 
-	uint32_t delta_odo=newODO();
+
+/*******************Process new ODO count ******************************/
+uint32_t delta_odo=newODO();
    if(delta_odo)
    {
-       static  uint32_t PLidarArray[5] FAST_USER_VAR; ;
-
-	   PLidarArray[4]=PLidarArray[3] ;
-	   PLidarArray[3]=PLidarArray[2] ;
-	   PLidarArray[2]=PLidarArray[1] ;
-	   PLidarArray[1]=PLidarArray[0] ;
-	   PLidarArray[0]=LIDAR_VALUE;
-
-	   uint32_t a1=(PLidarArray[3]+PLidarArray[4])/2;
-	   uint32_t a0=(PLidarArray[1]+PLidarArray[0])/2;
-
-	   if (a1>(a0+lidar_corner.det_diff))
-	   {
-		if((PLidarArray[4]>a0) && (PLidarArray[3]>a0))
-			{
-			ProcessCorner(-1,a0);
-			}//From Open Corner to toward me
-	   }
-	   else
-	  if(a0>(a1+lidar_corner.det_diff))
-	  {
-		  if((PLidarArray[4]<a0) && (PLidarArray[3]<a0))
-			  ProcessCorner(+1,a1);
-	  }
-
-      nOdo++;
+       nOdo++;
 	//uint32_t ts=sim2.timer[3].tcn; 
 	   if(DtOdoCount==0)
 		calc_speed=0;
@@ -1118,8 +1178,44 @@ void UserMain(void * pd)
 		 int32_t b=0;
 		 uint32_t pc=0;
 
-		 //cpo.sn=ProcessLidarLines(b,tc);
-		 
+
+		{ static  uint32_t PLidarArray[16] FAST_USER_VAR; ;
+	      static  fPoint pre_pos[16];
+		  static  int head_index[16];
+	      static  int index;
+
+	      PLidarArray[index&0x0f]=LIDAR_VALUE;
+	      pre_pos[index&0x0f]=CurPos;
+		  head_index[index&0x0f]=usehead_index;
+
+
+	      uint32_t a1=(PLidarArray[(index-3)&0x0f]+PLidarArray[(index-2)&0x0f])/2;
+	      uint32_t a0=(PLidarArray[(index-1)&0x0F]+PLidarArray[index&0x0f])/2;
+
+			 if (a1>(a0+lidar_corner.det_diff))
+			 {
+			  if((PLidarArray[(index-3)&0x0f]>a0) && (PLidarArray[(index-2)&0x0f]>a0))
+				  {
+				  fPoint fp= AvgPoint(pre_pos[(index-2)&0x0f],pre_pos[(index-1)&0x0f]);
+				  int32_t ah=AvgHIndex(head_index[(index-2)&0x0f],head_index[(index-2)&0x0f]);
+
+				  ProcessCorner(-1,a0,fp,ah);
+				  }//From Open Corner to toward me
+			 }
+			else
+			 if(a0>(a1+lidar_corner.det_diff))
+			   {
+				if((PLidarArray[(index-3)&0x0f]<a0) && (PLidarArray[(index-3)&0x0f]<a0))
+				{ 
+				  fPoint fp=AvgPoint(pre_pos[(index-2)&0x0f],pre_pos[(index-1)&0x0f]);
+				  int32_t ah=AvgHIndex(head_index[(index-2)&0x0f],head_index[(index-2)&0x0f]);
+					ProcessCorner(+1,a1,fp,ah);
+				}
+			  }
+				index++;
+		}
+
+
 		 fPoint ProjectPos=CurPos;
 		 unsigned long was_head_index=usehead_index;
 		  if(DtOdoCount!=0)
@@ -1289,6 +1385,12 @@ void UserMain(void * pd)
 
    }
 
+
+
+
+
+/********************************Time to do new servo frame ***********************/
+
    if(newServoFrame())
    {
 #ifdef SIM
@@ -1338,8 +1440,9 @@ void UserMain(void * pd)
 	   	   last_motor=0;
 	    }
    }
- }
-
+ 
+  }
+/***********************************End of monster while **********************/
 
 
 }
