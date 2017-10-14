@@ -10,6 +10,7 @@ void SetUpTables(float dist);
 void LookUpSinCosDistIndex(unsigned long index, float & s ,float & c);
 void LookUpSinCosIndex(unsigned long index, float & s ,float & c);
 unsigned long ConvertDegToIndex(float deg);
+float ConvertIndexToFloat(unsigned long index);
 
 
 

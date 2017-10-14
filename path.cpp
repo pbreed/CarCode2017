@@ -126,6 +126,8 @@ int ShowCurPath(int sock, const char* pUrl)
 		  fdprintf(sock,"<TD></TD>");
 	  }
 
+	  fdprintf(sock,"<TD>%s</TD>",PathArray[i].m_option);
+
 	  if(PathArray[i].m_bDoEdge)
 		  fdprintf(sock,"<TD>%g</TD>",PathArray[i].m_edge_dist);
 	  else
@@ -443,6 +445,7 @@ n++;
 
 
 num_raw_paths=rn;
+//RawPaths[0].m_mode=eBar;
 }//We parse stuff cp!=null
 
 }
@@ -509,6 +512,7 @@ return false;
 void ReadString(const char* &cp, char * dest, int maxlen )
 {
 	trimlead(cp);
+	iprintf("Read string [%c%c%c%c]\r\n",cp[0],cp[1],cp[2],cp[3],cp[4]);
 	if((*cp=='"')|| (*cp=='\''))
 	{
 		char cpd=*cp;
@@ -527,6 +531,7 @@ void ReadString(const char* &cp, char * dest, int maxlen )
 		   cp++;
 	}
 	if(maxlen) *dest=0;
+	iprintf("Result[%s]\r\n",dest);
 
 	trimlead(cp);
 }
@@ -774,6 +779,8 @@ bool path_element::Parse(const char * & cp,int def_next_seq)
   else
  if(strid(cp,"Options")){if(!nextnull(cp))ReadString(cp,m_option,20); }
  else
+ if(strid(cp,"options")){if(!nextnull(cp))ReadString(cp,m_option,20); }
+ else
  if(strid(cp,"bStop")){if(ReadBool(cp)) next_seq=-1;}
  else
  if(strid(cp,"Speed"))
@@ -874,6 +881,8 @@ void raw_path::CalcLineStuff()
 {
 if(bArc)
 {
+	m_mode=eNormal;
+
  //Given speed and radius we want rotvel in deg/sec
 m_eWall=eOff;
 float circ=radius*2.0*PI;
@@ -890,10 +899,21 @@ if(PathArray[ref_path_num].m_bDoEdge)
   else
 	     m_eWall=eLeft;  
   wall_dist=PathArray[ref_path_num].m_edge_dist;
+  m_bAdjust_Heading=PathArray[ref_path_num].m_adj_head;
 }
 else
 {
  m_eWall=eOff; 
+}
+
+switch(PathArray[ref_path_num].m_option[0])
+{
+case 'b':
+case 'B':m_mode=eBar; break;
+case 'p':
+case 'P':m_mode = ePed; break;
+default:
+	  m_mode=eNormal;
 }
 
 if(PathArray[ref_path_num].m_bDoCorner)
@@ -949,6 +969,8 @@ if(line_dx==0)
  }
 //Now the hard cases we are not DXor Dy=0
 float  dist = (cross_a * pos.x + cross_b - pos.y)*inverse_caroot;
+//printf("POS[%g,%g] Start [%g,%g] End[%g,%g]\r\n",pos.x,pos.y,start_point.x,start_point.y,end_point.x,end_point.y);
+
 if(line_dx<0) xtk=-dist;
 else xtk=dist;
 
@@ -1015,11 +1037,23 @@ if (bArc)
    return LineCalc(pos,cur_head,best_head,xtk,targ_speed,t_rotv);
 }
 
+const char * GetOptionName(NavOpMode nm)
+{
+switch(nm)
+{
+case eNormal: return "Norm";
+case eBar: return "Bar";
+case ePed: return "Ped";
+default:return "???";
+}
+return "???";
+}
+
 
 void raw_path::RenderTable(int fd )
 {
-	fdprintf(fd,"<TR><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%d</TD><TD>%s</TD>",
-				start_point.x, start_point.y, end_point.x,end_point.y,total_dist,start_head,end_head,radius,start_speed ,end_speed,ref_path_num,GetLidarStateName(m_eWall));
+	fdprintf(fd,"<TR><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%g</TD><TD>%d</TD><TD>%s,%s</TD>",
+				start_point.x, start_point.y, end_point.x,end_point.y,total_dist,start_head,end_head,radius,start_speed ,end_speed,ref_path_num,GetLidarStateName(m_eWall),GetOptionName(m_mode));
 	if(!bArc)
 		fdprintf(fd,"<TD></TD>");
 	else

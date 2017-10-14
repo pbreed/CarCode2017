@@ -23,6 +23,8 @@ Options=null;	//null ped bar ramp
 Speed=null or mph
 */
 
+enum NavOpMode {eNormal,eBar, ePed};
+
 
 
 struct path_element
@@ -93,6 +95,7 @@ PathInitalValue();
 };
 
 
+
 bool Parse(const char * & cp,int def_next_seq);
 void Show();
 float Dist(const path_element & p) {return pt.Dist(p.pt); };
@@ -106,6 +109,8 @@ struct raw_path
 {fPoint start_point;
  fPoint end_point;
 
+ NavOpMode m_mode;
+
  //Arc stuff
  fPoint center_pt;
  float radius;
@@ -118,6 +123,7 @@ struct raw_path
 
  LidarWallMode  m_eWall;
  float wall_dist; //+ to right, - to left 
+ bool m_bAdjust_Heading;
 
  int m_CornerSign; //-1 is drop away +1 is jump in 0 is no corner
  fPoint Corner_pos;

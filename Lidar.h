@@ -20,6 +20,9 @@ int GetLidarResult(int32_t & b,uint32_t &tc, uint32_t &pc);
 void LidarSampleStart(LidarWallMode mode);
 
 float SlopeNumToDeg(int SlopeNum); 
+int GetLidarHeading(int DesiredHead);
+
+bool DoPedStop();
 
 
 struct IntPoint

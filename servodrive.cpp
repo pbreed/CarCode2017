@@ -205,6 +205,18 @@ void SetServoRaw(int ch, int v)
 }
 
 
+void SetServoHighRaw(int ch, int v)
+{
+	if ((ch<0) || (ch>=NUM_SERVO_DRIVE)) return;
+
+    float f=v;
+	f-=1024;
+	f/=500;
+	SetServoPos(ch,f);
+}
+
+
+
 int GetServoCount(int servo)
 {
 return ServoTimes[servo];

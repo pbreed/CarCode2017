@@ -911,3 +911,18 @@ RawHeadSum=(int)a;
 RawHeading=DegScale(RawHeadSum);
 }
 
+
+
+void SimDo(int32_t v)
+{
+GAxisSum[2]=RawHeadSum=v;
+IntegratedHeading=DegScale(GAxisSum[2]);
+RawHeading=DegScale(RawHeadSum);
+   ImuR.lidar=LIDAR_VALUE;
+   ImuR.lidmin=LIDAR_VALUE;
+   ImuR.odo=OdoCount;
+   ImuR.dtodo=DtOdoCount;
+   ImuR.head=IntegratedHeading;
+   ImuR.rhead=RawHeading;
+   ImuR.Log();
+}

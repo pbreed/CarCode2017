@@ -140,6 +140,13 @@ unsigned long ConvertDegToIndex(float deg)
 return (deg*131072.0/180.0); 
 }
 
+float ConvertIndexToFloat(unsigned long i)
+{
+	i&=0x3FFFF;
+	return (float)(180*i)/131072.0;
+}
+
+
 
 
 

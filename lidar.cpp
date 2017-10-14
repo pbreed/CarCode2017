@@ -307,8 +307,8 @@ void LIDAR_CALC_Task(void * pd)
 while(1)
  {
   LidarCalcSem.Pend(0);
-  		 LidarState.a=6;
-		 LidarState.Log();
+  		 //LidarState.a=6;
+		 //LidarState.Log();
   pcResult=LidarPointCount;
   int32_t b;
   uint32_t tc;
@@ -317,8 +317,8 @@ while(1)
   tcResult=tc;
   LidarPointCount=0;
   LidarMode=DoneMode;
-  LidarState.a=8;
-  LidarState.Log();
+ // LidarState.a=8;
+ // LidarState.Log();
 
  }
 }
@@ -687,6 +687,78 @@ float SlopeNumToDeg(int SlopeNum)
 
  return SlopeTable[SlopeNum];
 }
+
+
+bool is_clear[360];
+
+bool NotClear(int i)
+{
+if(i<0) i+=360;
+return !is_clear[i];
+}
+
+
+bool IsClear(int h)
+{for(int i=(h-16); i<(h+16); i++)
+{
+    if(NotClear(i)) return false;
+}
+
+ return true;
+}
+
+//Head is realtive to Car straight is 0...positive to right
+int GetLidarHeading(int DesiredHead)
+{
+   uint32_t limit=100; //About 40 in
+   
+   for(int i=0; i<360;  i++)
+   {
+	 //iprintf("%3d:%6d,%6d\r\n",i,ssUResult[i],UResult[i]);
+	 if((ssUResult[i]>2) && (UResult[i]<limit))is_clear[i]=false;
+	 else is_clear[i]=true;
+	// if(is_clear[i]) iprintf(".");
+	// else iprintf("X,");
+	// if((i==90)||(i==180)||(i==270)) printf("\r\n");
+
+   }
+
+
+   if (IsClear(DesiredHead))
+	   {
+	//    iprintf("DH Clear\r\n");
+	    return DesiredHead;		
+       }
+ 
+   for(int i=1; i<73; i++)
+       {
+		iprintf("%d",i);
+	    if(IsClear(DesiredHead-i)) return DesiredHead-i;
+	    if(IsClear(DesiredHead+i)) return DesiredHead+i;
+       }
+  
+  // iprintf("No clear\r\n");
+	return -999; //We failed bull through
+}
+
+
+
+
+bool DoPedStop()
+{
+ int ns=0;
+ for(int i=0; i<20; i++)
+	 if((ssUResult[i]>2) && (UResult[i]<150)) ns++;
+
+  for(int i=339; i<360; i++)
+		 if((ssUResult[i]>2) && (UResult[i]<150)) ns++;
+LidarState.a=ns;
+LidarState.Log();
+if (ns>=8  ) return true;
+return false;
+
+}
+
 
 
 
