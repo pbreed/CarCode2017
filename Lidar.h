@@ -35,7 +35,12 @@ int y;
 
 extern volatile IntPoint LidarPointSet[MAX_LIDAR_POINTS];
 extern volatile uint32_t LidarPointCount;
-extern volatile bool bLidarRight;
-extern volatile bool bLidarLeft;
+
+
+//Bit mapped 11111111 means -90..+90 clear
+//           00000000 means nothing open.
+//           00001111 means left side blocked...
+//           11110000 means right side blocked.
+extern volatile uint8_t warning_byte;
 
 

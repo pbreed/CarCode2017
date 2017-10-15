@@ -19,6 +19,7 @@ RunProperties():config_obj(appdata,"RunProp") {};
 	config_double Speed_G{0.02,"SpeedG"};
 	config_double Speed_M{0.015185185,"SpeedM"};
 	config_double Speed_B{0.056666667,"SpeedB"};
+	config_int    WarnTurnAngle{30,"WarnTurn"};
 	ConfigEndMarker;
 };
 

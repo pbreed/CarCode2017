@@ -24,7 +24,36 @@ volatile LidarWallMode LidarMode;
 volatile LidarWallMode DoneMode;
 
 
+
+
 OS_SEM LidarCalcSem;
+
+const unsigned int WarnLimit[360]={121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,
+	121,121,121,121,121,118,115,111,109,106,103,101,99,96,94,92,91,89,87,86,84,83,82,80,79,78,77,76,75,74,73,72,71,71,70,69,69,
+	68,67,67,66,66,65,65,64,64,64,63,63,63,62,62,62,62,61,61,61,61,61,61,61,61,60,60,60,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,60,60,61,61,61,61,61,61,61,61,62,62,62,62,
+	63,63,63,64,64,64,65,65,66,66,67,67,68,69,69,70,71,71,72,73,74,75,76,77,78,79,80,82,83,84,86,87,89,91,92,94,96,99,101,103
+	,106,109,111,115,118,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,121,
+	121,121,121,121,121};
+
+	const uint8_t warn_mask[360]={231,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,247,
+251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,251,253,253,253,253,253,253,253,253,
+253,253,253,253,253,253,253,253,253,253,253,253,253,253,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,
+254,254,254,254,254,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,191,191,191,191,191,191,191,191,191,
+191,191,191,191,191,191,191,191,191,191,191,191,191,191,223,223,223,223,223,223,223,223,223,223,223,223,223,223,223,223,223,
+223,223,223,223,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239,239};
+
+
+
+
 
 
 
@@ -53,6 +82,17 @@ volatile uint32_t ssResult[360];
 volatile uint32_t UResult[360];
 volatile uint32_t ssUResult[360];
 volatile uint32_t LidarScanCount;
+
+uint8_t calc_warn_byte;
+volatile uint8_t warning_byte;
+ 
+
+
+
+volatile bool OpenLeftSector[6];
+volatile bool OpenRightSector[6];
+
+
 
 
 
@@ -107,8 +147,12 @@ inline void LIDAR_ProcessChar(uint8_t c)
 					ssUResult[i]=ssResult[i];
 					Result[i]=0;
 					ssResult[i]=0;
-					LidarScanCount++;					
-				   }
+					LidarScanCount++;
+					}
+
+					warning_byte=calc_warn_byte;
+					calc_warn_byte=0xff;
+
 				}
 				uint32_t d;
 				d=po->d_msb;
@@ -162,6 +206,11 @@ inline void LIDAR_ProcessChar(uint8_t c)
 				  {
 					  ssResult[index]=ss;
 					  Result[index]=(d/40);
+					  if(Result[index]<WarnLimit[index])
+					  {
+						calc_warn_byte&=warn_mask[index];
+                        
+					  }
 					  
 					  LidarHit.a=a;
 					  LidarHit.d=d;
@@ -689,19 +738,25 @@ float SlopeNumToDeg(int SlopeNum)
 }
 
 
-bool is_clear[360];
+const int LidarAngleLimit[46] 
+={100,100,100,100,100,100,100,100,100,100,100,100,99,91,85,79,74,70,67,63,60,
+   57,55,53,51,49,47,46,44,43,41,40,39,38,37,36,35,35,34,33,32,32,31,31,30,30};
 
-bool NotClear(int i)
+int a_range[360];
+
+bool NotClear(int i,int limit)
 {
 if(i<0) i+=360;
-return !is_clear[i];
+return (a_range[i]<limit);
 }
 
 
-bool IsClear(int h)
-{for(int i=(h-16); i<(h+16); i++)
+bool IsClear(int h,int span)
 {
-    if(NotClear(i)) return false;
+for(int i=0; i<span; i++)
+{
+    if(NotClear(h+i,LidarAngleLimit[i])) return false;
+    if(NotClear(h-i,LidarAngleLimit[i])) return false;
 }
 
  return true;
@@ -710,32 +765,30 @@ bool IsClear(int h)
 //Head is realtive to Car straight is 0...positive to right
 int GetLidarHeading(int DesiredHead)
 {
-   uint32_t limit=100; //About 40 in
    
    for(int i=0; i<360;  i++)
    {
-	 //iprintf("%3d:%6d,%6d\r\n",i,ssUResult[i],UResult[i]);
-	 if((ssUResult[i]>2) && (UResult[i]<limit))is_clear[i]=false;
-	 else is_clear[i]=true;
-	// if(is_clear[i]) iprintf(".");
-	// else iprintf("X,");
-	// if((i==90)||(i==180)||(i==270)) printf("\r\n");
-
+	 if(ssUResult[i]>2) a_range[i]=UResult[i];
+	 else a_range[i]=999;
    }
 
 
-   if (IsClear(DesiredHead))
+   if (IsClear(DesiredHead,44))
 	   {
-	//    iprintf("DH Clear\r\n");
 	    return DesiredHead;		
        }
  
    for(int i=1; i<73; i++)
        {
-		iprintf("%d",i);
-	    if(IsClear(DesiredHead-i)) return DesiredHead-i;
-	    if(IsClear(DesiredHead+i)) return DesiredHead+i;
+	    if(IsClear(DesiredHead-i,45)) return DesiredHead-i;
+	    if(IsClear(DesiredHead+i,45)) return DesiredHead+i;
        }
+
+   for(int i=1; i<73; i++)
+	  {
+	   if(IsClear(DesiredHead-i,16)) return DesiredHead-i;
+	   if(IsClear(DesiredHead+i,16)) return DesiredHead+i;
+	  }
   
   // iprintf("No clear\r\n");
 	return -999; //We failed bull through

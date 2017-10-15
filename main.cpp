@@ -44,6 +44,7 @@ RunProperties RunProps;
 OS_SEM MainTaskSem;
 
 static uint32_t tPedStop;
+static bool DoLidarWarnings;
 
 const char * AppName="Avc2017";
 
@@ -355,9 +356,8 @@ float_element xh{"xh"};
 float_element ts{"tspeed"};
 float_element x{"x"};
 float_element y{"y"};
-uint32_element dt1{"dt1"};
-uint32_element dt{"dt"};
-int32_element  da{"da"};
+float_element da{"da"};
+int32_element w{"w"};
 END_INTRO_OBJ;
 
 
@@ -515,6 +515,12 @@ void NextPoint()
 	 if(RunProps.StopOnRcLoss==false) bLog=false;
 	 return;
 	}
+
+	DoLidarWarnings=((CurPathIndex>1) && (RawPaths[CurPathIndex].m_mode==eNormal) &&(RawPaths[CurPathIndex].end_speed!=0));
+	   
+	   
+
+
 	 RawPaths[CurPathIndex].CornerSatisfied=false;
     NextPointObj.rp=CurPathIndex;
     NextPointObj.cp=RawPaths[CurPathIndex].ref_path_num;
@@ -532,6 +538,50 @@ void ProcessCorner(int sign, uint32_t counts,fPoint p_at_det,int32_t head_index)
    corn.h=head_index;
    corn.Log();
 }
+/* Made with these rules
+      int s=0;
+	  if(wb==0) s=0;
+	  else
+	  if(wb==0xff) s=0;
+	  else
+	  if((wb&0xF)==0xF) s=1;
+	  else
+	  if((wb&0xF0)==0xF0) s=-1;
+	  else
+	  if((wb&0x18)==0x18) s=0;
+	  else
+	  if((wb&0x10)==0x10) s=-1;
+	  else
+	  if((wb&0x08)==0x08) s=1;
+	  else
+	  if((wb&0x20)==0x20) s=-1;
+	  else
+	  if((wb&0x04)==0x04) s=1;
+	  else
+	  if((wb&0x40)==0x40) s=-2;
+	  else
+	  if((wb&0x02)==0x02) s=2;
+	  else
+	  if((wb&0x80)==0x80) s=-2;
+	  else
+	  if((wb&0x01)==0x01) s=2;
+	  else
+		  s=0; //Should not be able to get here
+*/
+
+
+const int ActionTable[256]={
+	+0,+2,+2,+2,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+0,+0,+0,+0,+0,+0,+0,+1,
+-1,-1,-1,-1,-1,-1,-1,-1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+0,+0,+0,+0,+0,+0,+0,+1,
+-2,-2,-2,-2,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+0,+0,+0,+0,+0,+0,+0,+1,
+-1,-1,-1,-1,-1,-1,-1,-1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+0,+0,+0,+0,+0,+0,+0,+1,
+-2,-2,+2,+2,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+0,+0,+0,+0,+0,+0,+0,+1,
+-1,-1,-1,-1,-1,-1,-1,-1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+0,+0,+0,+0,+0,+0,+0,+1,
+-2,-2,-2,-2,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+0,+0,+0,+0,+0,+0,+0,+1,
+-1,-1,-1,-1,-1,-1,-1,-1,+1,+1,+1,+1,+1,+1,+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,+0
+};
+
+
 
 
   static uint32_t LastLidarScanCount; 
@@ -630,8 +680,20 @@ float DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
 
   }
   NavCalcObj.da=0;
+  NavCalcObj.w=0; 
 
+  if((DoLidarWarnings ) && (warning_byte!=0xFF))
+  {
+	  NavCalcObj.w=warning_byte;
+	  TargetHeading+=ActionTable[warning_byte]*RunProps.WarnTurnAngle;
+  }
+  else
+	  NavCalcObj.w=0;
 
+   if(TargetHeading>180) TargetHeading-=360;
+   if(TargetHeading<(-180))TargetHeading+=360;
+
+  
   NavCalcObj.xtk=xtk;
   NavCalcObj.hd=TargetHeading;
   NavCalcObj.ts=SegSpeed;
@@ -717,7 +779,8 @@ void LCD_DisplayTask(void * pd)
 
 
 	  LCD_X_Y(LCD_SER,0,1);
-	  fdprintf(LCD_SER,"L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
+	  fdprintf(LCD_SER,"[%08b] L:%3ld",warning_byte,GetLogPercent());
+//	  fdprintf(LCD_SER,"L:%ld:R:%2ld %3ld ",(LidarScanCount-LastLidar)/1000,RCFrameCnt-LastRCFrame,GetLogPercent());
 
 	  if(RCFrameCnt-LastRCFrame<10) 
 		  bRCFrameError=true;
@@ -979,7 +1042,14 @@ void UserMain(void * pd)
 
     InitSingleEndAD();
 	StartAD();
+	while(!ADDone()) OSTimeDly(1);
 
+	if(
+	   (GetADResult(1)>25000) &&
+	   (GetADResult(2)>25000) &&
+	   (GetADResult(3)>25000)
+	  ) 
+		RunProps.StopOnRcLoss=false;
 
 
 
