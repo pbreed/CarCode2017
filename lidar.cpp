@@ -737,7 +737,7 @@ float SlopeNumToDeg(int SlopeNum)
  return SlopeTable[SlopeNum];
 }
 
-
+/*
 const int LidarAngleLimit[46] 
 ={100,100,100,100,100,100,100,100,100,100,100,100,99,91,85,79,74,70,67,63,60,
    57,55,53,51,49,47,46,44,43,41,40,39,38,37,36,35,35,34,33,32,32,31,31,30,30};
@@ -793,6 +793,62 @@ int GetLidarHeading(int DesiredHead)
   // iprintf("No clear\r\n");
 	return -999; //We failed bull through
 }
+
+  */
+
+bool is_clear[360];
+
+bool NotClear(int i)
+{
+if(i<0) i+=360;
+return !is_clear[i];
+}
+
+
+bool IsClear(int h)
+{for(int i=(h-16); i<(h+16); i++)
+{
+    if(NotClear(i)) return false;
+}
+
+ return true;
+}
+
+//Head is realtive to Car straight is 0...positive to right
+int GetLidarHeading(int DesiredHead)
+{
+   uint32_t limit=100; //About 40 in
+   
+   for(int i=0; i<360;  i++)
+   {
+	 //iprintf("%3d:%6d,%6d\r\n",i,ssUResult[i],UResult[i]);
+	 if((ssUResult[i]>2) && (UResult[i]<limit))is_clear[i]=false;
+	 else is_clear[i]=true;
+	// if(is_clear[i]) iprintf(".");
+	// else iprintf("X,");
+	// if((i==90)||(i==180)||(i==270)) printf("\r\n");
+
+   }
+
+
+   if (IsClear(DesiredHead))
+	   {
+	//    iprintf("DH Clear\r\n");
+	    return DesiredHead;		
+       }
+ 
+   for(int i=1; i<73; i++)
+       {
+		iprintf("%d",i);
+	    if(IsClear(DesiredHead-i)) return DesiredHead-i;
+	    if(IsClear(DesiredHead+i)) return DesiredHead+i;
+       }
+  
+  // iprintf("No clear\r\n");
+	return -999; //We failed bull through
+}
+
+
 
 
 

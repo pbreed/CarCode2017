@@ -357,6 +357,7 @@ float_element ts{"tspeed"};
 float_element x{"x"};
 float_element y{"y"};
 float_element da{"da"};
+float_element ra{"ra"};
 int32_element w{"w"};
 END_INTRO_OBJ;
 
@@ -437,7 +438,7 @@ if(RawPaths[CurPathIndex].m_mode==eBar) err*=2;
  slo.e=err;
 
  sv-=(float)RunProps.SteerZero;
- SetServoPos(0,-sv);
+ SetServoPos(STEER_SERVO ,-sv);
 /*
 if(bIsMoving())
 {
@@ -667,6 +668,7 @@ float DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
    {
    LastLidarScanCount=LidarScanCount;
    int da=(int)turn_angle(head,TargetHeading);
+   NavCalcObj.da=da;
    int ra=GetLidarHeading(da);
    if(ra!=-999)
    {
@@ -675,11 +677,14 @@ float DoNewNavCalcs(const fPoint &proj_pt, float proj_head)
    if(TargetHeading<(-180))TargetHeading+=360;
    }
    bLidarStop=false;
-   NavCalcObj.da=ra;
+   NavCalcObj.ra=ra;
    }
 
   }
-  NavCalcObj.da=0;
+  else
+  {NavCalcObj.da=0;
+   NavCalcObj.ra=0; 
+  }
   NavCalcObj.w=0; 
 
   if((DoLidarWarnings ) && (warning_byte!=0xFF))
